@@ -1,0 +1,13 @@
+[package]
+name = "skladno-clients"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+skladno-core.workspace = true
+sqlx.workspace = true
+uuid.workspace = true

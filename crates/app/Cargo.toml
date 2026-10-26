@@ -1,0 +1,20 @@
+[package]
+name = "skladno"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+skladno-catalog.workspace = true
+skladno-clients.workspace = true
+skladno-core.workspace = true
+skladno-deliveries.workspace = true
+sqlx.workspace = true
+tokio.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+uuid.workspace = true

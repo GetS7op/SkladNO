@@ -1,0 +1,22 @@
+name: skladno
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: skladno
+      POSTGRES_USER: skladno
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Запустите scripts/configure.sh}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-55433}:5432"
+    volumes:
+      - data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skladno -d skladno"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  data:
