@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::{
     create_session,
     profile::{self, ME_COLUMNS, Me, ProfileInput},
-    secrets, session_cookie, session_token,
+    is_https, secrets, session_cookie, session_token,
 };
 
 /// Пауза после неудачного входа: перебор паролей становится медленным.
@@ -87,7 +87,11 @@ async fn insert_user(
 }
 
 /// Первый запуск: пока пользователей нет, форма создаёт администратора.
-async fn setup(State(db): State<Db>, Json(input): Json<ProfileInput>) -> AppResult<impl IntoResponse> {
+async fn setup(
+    State(db): State<Db>,
+    headers: HeaderMap,
+    Json(input): Json<ProfileInput>,
+) -> AppResult<impl IntoResponse> {
     let mut tx = db.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock($1)").bind(SETUP_LOCK).execute(&mut *tx).await?;
     let exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM users)")
@@ -97,7 +101,7 @@ async fn setup(State(db): State<Db>, Json(input): Json<ProfileInput>) -> AppResu
         return Err(AppError::Conflict("Администратор уже создан — войдите".into()));
     }
     let id = insert_user(&mut tx, &input, "admin").await?;
-    let cookie = create_session(&mut *tx, id).await?;
+    let cookie = create_session(&mut *tx, id, &headers).await?;
     let me = fetch_me(&mut *tx, id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, [(header::SET_COOKIE, cookie)], Json(me)))
@@ -116,7 +120,11 @@ struct Credentials {
     active: bool,
 }
 
-async fn login(State(db): State<Db>, Json(input): Json<LoginInput>) -> AppResult<impl IntoResponse> {
+async fn login(
+    State(db): State<Db>,
+    headers: HeaderMap,
+    Json(input): Json<LoginInput>,
+) -> AppResult<impl IntoResponse> {
     let found = sqlx::query_as::<_, Credentials>(
         "SELECT id, password_hash, active FROM users WHERE lower(login) = lower($1)",
     )
@@ -138,7 +146,7 @@ async fn login(State(db): State<Db>, Json(input): Json<LoginInput>) -> AppResult
         .bind(user.id)
         .execute(&mut *tx)
         .await?;
-    let cookie = create_session(&mut *tx, user.id).await?;
+    let cookie = create_session(&mut *tx, user.id, &headers).await?;
     let me = fetch_me(&mut *tx, user.id).await?;
     tx.commit().await?;
     Ok(([(header::SET_COOKIE, cookie)], Json(me)))
@@ -151,7 +159,7 @@ async fn logout(State(db): State<Db>, headers: HeaderMap) -> AppResult<impl Into
             .execute(&db)
             .await?;
     }
-    Ok(([(header::SET_COOKIE, session_cookie("", 0))], StatusCode::NO_CONTENT))
+    Ok(([(header::SET_COOKIE, session_cookie("", 0, is_https(&headers)))], StatusCode::NO_CONTENT))
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -183,7 +191,11 @@ struct RegisterInput {
     profile: ProfileInput,
 }
 
-async fn register(State(db): State<Db>, Json(input): Json<RegisterInput>) -> AppResult<impl IntoResponse> {
+async fn register(
+    State(db): State<Db>,
+    headers: HeaderMap,
+    Json(input): Json<RegisterInput>,
+) -> AppResult<impl IntoResponse> {
     let mut tx = db.begin().await?;
     let (invite_id, role) = sqlx::query_as::<_, (Uuid, String)>(&format!(
         "SELECT id, role FROM invites WHERE {VALID_INVITE} FOR UPDATE"
@@ -198,7 +210,7 @@ async fn register(State(db): State<Db>, Json(input): Json<RegisterInput>) -> App
         .bind(id)
         .execute(&mut *tx)
         .await?;
-    let cookie = create_session(&mut *tx, id).await?;
+    let cookie = create_session(&mut *tx, id, &headers).await?;
     let me = fetch_me(&mut *tx, id).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, [(header::SET_COOKIE, cookie)], Json(me)))

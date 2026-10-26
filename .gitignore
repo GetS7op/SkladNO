@@ -5,3 +5,4 @@ node_modules
 *.log
 /backups
 /.dev-accounts.md
+/skladno-ca.crt

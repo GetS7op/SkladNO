@@ -1,0 +1,39 @@
+# HTTPS для SkladNO в локальной сети.
+# Caddy — свой центр сертификации (ЦС): сам выпускает и продлевает сертификат на адрес сервера.
+# Устройствам нужно один раз доверить корневой сертификат ЦС — его можно скачать по
+# http://<IP сервера>/ca.crt (см. README, раздел «HTTPS»).
+#
+# SKLADNO_IP    — IP сервера в сети фермы, например 192.168.1.10.
+# SKLADNO_NAMES — необязательные имена через пробел, например «skladno.local» (если есть DNS).
+
+{
+	# Не пытаться ставить ЦС в систему контейнера: доверие настраивается на устройствах.
+	skip_install_trust
+	# Внешние ACME (Let's Encrypt) не нужны: всё выпускает внутренний ЦС.
+	local_certs
+	# HTTP обрабатывает блок «http://» ниже: он отдаёт /ca.crt и сам перенаправляет на HTTPS.
+	auto_https disable_redirects
+	# При обращении по IP браузер не сообщает имя сервера (SNI) — отдаём сертификат на IP.
+	default_sni {$SKLADNO_IP}
+}
+
+{$SKLADNO_IP} {$SKLADNO_NAMES} {
+	tls internal
+	encode gzip
+	reverse_proxy app:8090
+}
+
+# По HTTP — только корневой сертификат (его ставят, пока устройство ещё не доверяет HTTPS),
+# остальное перенаправляется на HTTPS.
+http:// {
+	handle /ca.crt {
+		root * /data/caddy/pki/authorities/local
+		rewrite * /root.crt
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=\"skladno-ca.crt\""
+		file_server
+	}
+	handle {
+		redir https://{host}:{$HTTPS_PORT}{uri} permanent
+	}
+}

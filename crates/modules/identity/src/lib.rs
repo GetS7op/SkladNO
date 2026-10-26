@@ -36,14 +36,27 @@ fn session_token(headers: &HeaderMap) -> Option<&str> {
         })
 }
 
-fn session_cookie(token: &str, max_age_seconds: i64) -> HeaderValue {
+/// Запрос пришёл по HTTPS через Caddy. Тогда cookie помечается Secure и не уйдёт по HTTP.
+fn is_https(headers: &HeaderMap) -> bool {
+    headers
+        .get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|proto| proto.eq_ignore_ascii_case("https"))
+}
+
+fn session_cookie(token: &str, max_age_seconds: i64, secure: bool) -> HeaderValue {
+    let secure = if secure { "; Secure" } else { "" };
     HeaderValue::from_str(&format!(
-        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age_seconds}"
+        "{SESSION_COOKIE}={token}; Path=/; HttpOnly; SameSite=Lax; Max-Age={max_age_seconds}{secure}"
     ))
     .expect("токен состоит из hex-символов")
 }
 
-async fn create_session<'e, E: sqlx::PgExecutor<'e>>(executor: E, user_id: Uuid) -> AppResult<HeaderValue> {
+async fn create_session<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    user_id: Uuid,
+    headers: &HeaderMap,
+) -> AppResult<HeaderValue> {
     let token = secrets::new_token();
     sqlx::query("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)")
         .bind(secrets::token_hash(&token))
@@ -51,7 +64,7 @@ async fn create_session<'e, E: sqlx::PgExecutor<'e>>(executor: E, user_id: Uuid)
         .bind(Utc::now() + Duration::days(SESSION_DAYS))
         .execute(executor)
         .await?;
-    Ok(session_cookie(&token, SESSION_DAYS * 24 * 60 * 60))
+    Ok(session_cookie(&token, SESSION_DAYS * 24 * 60 * 60, is_https(headers)))
 }
 
 #[derive(sqlx::FromRow)]
@@ -92,4 +105,27 @@ pub async fn authenticate(db: &Db, headers: &HeaderMap) -> AppResult<Option<Curr
         login: row.login,
         role,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cookie_is_secure_only_behind_https() {
+        let mut headers = HeaderMap::new();
+        assert!(!is_https(&headers));
+        assert!(!session_cookie("abc", 60, false).to_str().unwrap().contains("Secure"));
+        headers.insert("x-forwarded-proto", HeaderValue::from_static("https"));
+        assert!(is_https(&headers));
+        let cookie = session_cookie("abc", 60, true);
+        assert!(cookie.to_str().unwrap().ends_with("; Secure"));
+    }
+
+    #[test]
+    fn reads_session_token_from_cookie_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::COOKIE, HeaderValue::from_static("a=1; skladno_session=tok; b=2"));
+        assert_eq!(session_token(&headers), Some("tok"));
+    }
 }
