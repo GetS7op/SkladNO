@@ -29,6 +29,9 @@ services:
       DATABASE_URL: postgres://skladno:${POSTGRES_PASSWORD}@postgres:5432/skladno
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8090}:8090"
+    # Файлы документов поставок: том Docker или папка на сервере (например, смонтированная SMB-шара).
+    volumes:
+      - ${FILES_PATH:-files}:/srv/skladno/files
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,5 +58,6 @@ services:
 
 volumes:
   data:
+  files:
   caddy_data:
   caddy_config:

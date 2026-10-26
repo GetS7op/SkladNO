@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Check, Download, Search } from 'lucide-react';
+import { ArrowLeft, Check, Download, Printer, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, type DeliveryDetail } from '../api';
 import { useCan } from '../auth';
+import { DeliveryFiles } from '../components/DeliveryFiles';
 import { ScanPanel } from '../components/ScanPanel';
 import { ErrorBanner } from '../components/ui';
 import { STAGES, destinationLabel, downloadCsv, formatDate } from '../format';
@@ -59,6 +60,8 @@ export function DeliveryPage() {
           <dd>{destinationLabel(d.destination)}</dd>
         </dl>
       </section>
+
+      <DeliveryFiles deliveryId={d.id} />
 
       <section className="card">
         <h2>Строки</h2>
@@ -167,6 +170,9 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
           <Search size={14} />
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Index или модель" />
         </label>
+        <Link to={`/labels/delivery/${delivery.id}`} className="btn ghost">
+          <Printer size={16} /> Наклейки
+        </Link>
         <button
           type="button"
           className="btn ghost"

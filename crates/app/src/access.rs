@@ -21,10 +21,12 @@ fn required_role(method: &Method, path: &str) -> Option<Role> {
         return Some(Role::Operator);
     }
     let is_delivery_advance = path.starts_with("/deliveries/") && path.ends_with("/advance");
+    let is_delivery_file = path.starts_with("/deliveries/") && path.ends_with("/files");
     match path {
-        // Работа СА: создание поставки, приём сканированием, смена этапа (дальше проверяет обработчик).
+        // Работа СА: создание поставки, файлы документа, приём сканированием, смена этапа
+        // (дальше этап проверяет обработчик).
         "/deliveries" | "/placements" => Some(Role::Operator),
-        _ if is_delivery_advance => Some(Role::Operator),
+        _ if is_delivery_advance || is_delivery_file => Some(Role::Operator),
         // Остальные изменения — справочники и места: Старший СА.
         _ => Some(Role::Senior),
     }
@@ -65,6 +67,7 @@ mod tests {
         assert_eq!(required_role(&post, "/deliveries"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/placements"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/deliveries/1/advance"), Some(Role::Operator));
+        assert_eq!(required_role(&post, "/deliveries/1/files"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/devices"), Some(Role::Senior));
         assert_eq!(required_role(&put, "/modules/1"), Some(Role::Senior));
         assert_eq!(required_role(&get, "/users"), Some(Role::Admin));

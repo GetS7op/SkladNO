@@ -1599,6 +1599,8 @@ dependencies = [
  "serde_json",
  "skladno-core",
  "sqlx",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 

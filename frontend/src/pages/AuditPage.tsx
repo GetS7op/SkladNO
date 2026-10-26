@@ -13,6 +13,8 @@ const ENTITY_LABELS: Record<string, string> = {
   worker: 'Воркер',
   container: 'Контейнер',
   module: 'Модуль',
+  user: 'Пользователь',
+  invite: 'Приглашение',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -23,6 +25,11 @@ const ACTION_LABELS: Record<string, string> = {
   advance: 'смена этапа',
   place: 'размещение',
   move: 'перемещение',
+  attach: 'прикреплён файл',
+  import: 'импорт',
+  password: 'смена пароля',
+  reset_password: 'сброс пароля',
+  revoke: 'отзыв',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -61,6 +68,10 @@ const FIELD_LABELS: Record<string, string> = {
   containers_added: 'Добавлены контейнеры',
   containers_removed: 'Убрано контейнеров',
   containers_retyped: 'Сменён тип',
+  file: 'Файл',
+  size: 'Размер, байт',
+  role: 'Роль',
+  active: 'Активен',
 };
 
 const HIDDEN = new Set(['id', 'client_id', 'pool_id']);

@@ -6,3 +6,4 @@ node_modules
 /backups
 /.dev-accounts.md
 /skladno-ca.crt
+/data

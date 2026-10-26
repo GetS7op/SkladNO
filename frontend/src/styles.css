@@ -1076,6 +1076,102 @@ button.cell:hover {
   font-size: 13px;
 }
 
+/* Наклейки со штрихкодами */
+.labels {
+  display: grid;
+  gap: 8px;
+}
+.labels-a4 {
+  grid-template-columns: repeat(3, 63.5mm);
+}
+.labels-thermal {
+  grid-template-columns: repeat(auto-fill, 58mm);
+}
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2mm;
+  padding: 2mm 3mm;
+  background: #fff;
+  color: #000;
+  border: 1px dashed var(--line);
+  overflow: hidden;
+  text-align: center;
+}
+.labels-a4 .label {
+  width: 63.5mm;
+  height: 38.1mm;
+}
+.labels-thermal .label {
+  width: 58mm;
+  height: 40mm;
+}
+.label-main {
+  font-size: 15pt;
+  line-height: 1;
+}
+.label .barcode {
+  width: 100%;
+  height: 14mm;
+}
+.label-caption {
+  font-size: 7pt;
+  line-height: 1.2;
+}
+@media print {
+  .no-print,
+  .offline-banner {
+    display: none !important;
+  }
+  body,
+  .app-shell,
+  .workspace {
+    display: block;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+  }
+  .page {
+    display: block;
+    max-width: none;
+  }
+  .labels {
+    gap: 0;
+  }
+  .label {
+    border: 0;
+    break-inside: avoid;
+  }
+  .labels-thermal {
+    display: block;
+  }
+  .labels-thermal .label {
+    break-after: page;
+  }
+}
+
+/* Файлы поставки */
+.files {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.files li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.files a {
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;

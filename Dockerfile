@@ -15,11 +15,14 @@ COPY migrations migrations
 RUN cargo build --release --locked -p skladno
 
 FROM debian:bookworm-slim
-RUN useradd --system --no-create-home skladno
+# Фиксированный uid: его указывают при монтировании SMB-папки для файлов (uid=10001).
+RUN useradd --system --no-create-home --uid 10001 skladno \
+    && mkdir -p /srv/skladno/files && chown skladno /srv/skladno/files
 COPY --from=api /src/target/release/skladno /usr/local/bin/skladno
 COPY --from=web /web/dist /srv/skladno/web
 ENV BIND=0.0.0.0:8090 \
     STATIC_DIR=/srv/skladno/web \
+    FILES_DIR=/srv/skladno/files \
     RUST_LOG=info,sqlx=warn
 USER skladno
 EXPOSE 8090

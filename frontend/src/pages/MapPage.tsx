@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type MapData, type MapInstance } from '../api';
@@ -51,6 +52,9 @@ export function MapPage() {
             <span className="muted">
               {location ?? 'расположение не указано'} · {destinationLabel(wh)}
             </span>
+            <Link to={`/labels/shelves?module=${number}`} className="btn ghost">
+              <Printer size={16} /> Наклейки полок
+            </Link>
           </div>
           <div className="instances">
             {instances.map((inst) => (

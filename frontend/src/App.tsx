@@ -23,6 +23,7 @@ import { DeliveriesPage } from './pages/DeliveriesPage';
 import { DeliveryCreatePage } from './pages/DeliveryCreatePage';
 import { DeliveryPage } from './pages/DeliveryPage';
 import { DevicesPage } from './pages/DevicesPage';
+import { DeviceLabelsPage, ShelfLabelsPage } from './pages/LabelsPages';
 import { MapPage } from './pages/MapPage';
 import { ModulesPage } from './pages/ModulesPage';
 import { PoolsPage } from './pages/PoolsPage';
@@ -68,7 +69,7 @@ export function App() {
   const isAdmin = useCan('admin');
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar no-print">
         <NavLink to="/" className="brand">
           <span className="brand-mark">
             <LayoutGrid size={20} />
@@ -106,6 +107,8 @@ export function App() {
           <Route path="/clients" element={<ClientsPage />} />
           <Route path="/warehouses" element={<WarehousesPage />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/labels/shelves" element={<ShelfLabelsPage />} />
+          <Route path="/labels/delivery/:id" element={<DeviceLabelsPage />} />
           <Route path="/modules" element={<ModulesPage />} />
           <Route path="/containers" element={<ContainersPage />} />
           <Route path="/pools" element={<PoolsPage />} />

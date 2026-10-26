@@ -1,5 +1,6 @@
 //! F-03. Поставки устройств: шапка + строки, присвоение Index, этапы до закрытия.
 
+mod files;
 mod index;
 
 use std::collections::HashSet;
@@ -128,6 +129,7 @@ pub fn router() -> Router<Db> {
         .route("/deliveries/index-ranges", get(index_ranges))
         .route("/deliveries/{id}", get(detail))
         .route("/deliveries/{id}/advance", post(advance))
+        .merge(files::router())
 }
 
 async fn list(
