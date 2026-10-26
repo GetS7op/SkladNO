@@ -1363,6 +1363,8 @@ dependencies = [
  "skladno-clients",
  "skladno-core",
  "skladno-deliveries",
+ "skladno-locations",
+ "skladno-whitelists",
  "sqlx",
  "tokio",
  "tower-http",
@@ -1415,6 +1417,31 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "serde",
+ "serde_json",
+ "skladno-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "skladno-locations"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "serde",
+ "serde_json",
+ "skladno-catalog",
+ "skladno-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "skladno-whitelists"
+version = "0.1.0"
+dependencies = [
+ "axum",
  "serde",
  "serde_json",
  "skladno-core",

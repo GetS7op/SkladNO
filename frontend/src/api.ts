@@ -98,6 +98,8 @@ export interface DeliveryDevice {
   device_index: string;
   manufacturer: string;
   model: string;
+  /** Адрес полки MXCXSXP, если устройство размещено. */
+  location: string | null;
 }
 
 export interface CreateDeliveryInput {
@@ -127,7 +129,156 @@ export interface AuditEntry {
   changes: Record<string, unknown>;
 }
 
+export interface Pool {
+  id: string;
+  name: string;
+  stratum1: string;
+  stratum2: string | null;
+  stratum3: string | null;
+  allowed: boolean;
+  archived: boolean;
+  workers: number;
+}
+export interface PoolInput {
+  name: string;
+  strata: string[];
+  allowed: boolean;
+}
+
+export interface Worker {
+  id: string;
+  pool_id: string;
+  pool_name: string;
+  name: string;
+  group_name: string | null;
+  watcher_url: string | null;
+  archived: boolean;
+}
+export type WorkerInput = Pick<Worker, 'pool_id' | 'name' | 'group_name' | 'watcher_url'>;
+
+export interface Container {
+  id: string;
+  name: string;
+  short_name: string;
+  power_kw: number;
+  racks: number;
+  shelves_per_rack: number;
+  devices_per_shelf: number;
+  shelf_dims_mm: string | null;
+  description: string | null;
+  instances: number;
+}
+export type ContainerInput = Omit<Container, 'id' | 'instances'>;
+
+export interface ModuleInstance {
+  id: string;
+  number: number;
+  container_id: string;
+  container_name: string;
+  short_name: string;
+  capacity: number;
+  placed: number;
+}
+export interface Module {
+  id: string;
+  number: number;
+  location: string | null;
+  warehouse: Destination;
+  containers: ModuleInstance[];
+  capacity: number;
+  placed: number;
+}
+export interface ModuleInput {
+  number: number;
+  location: string | null;
+  warehouse: Destination;
+  containers: { number: number; container_id: string }[];
+}
+
+export interface MapInstance {
+  module_id: string;
+  module_number: number;
+  location: string | null;
+  warehouse: Destination;
+  id: string;
+  number: number;
+  name: string;
+  short_name: string;
+  racks: number;
+  shelves_per_rack: number;
+  devices_per_shelf: number;
+  power_kw: number;
+  load_w: number;
+}
+export interface MapData {
+  instances: MapInstance[];
+  shelves: { module_container_id: string; rack: number; shelf: number; count: number }[];
+}
+export interface ShelfInfo {
+  address: string;
+  warehouse: Destination;
+  capacity: number;
+  devices: { device_index: string; manufacturer: string; model: string; delivery_number: string }[];
+}
+export interface PlaceResult {
+  address: string;
+  device_index: string;
+  manufacturer: string;
+  model: string;
+  delivery_id: string;
+  delivery_number: string;
+  moved_from: string | null;
+  unchanged: boolean;
+  shelf_count: number;
+  shelf_capacity: number;
+}
+export interface WarehouseSummary {
+  warehouse: Destination;
+  modules: number;
+  containers: number;
+  capacity: number;
+  power_kw: number;
+  devices: number;
+  placed: number;
+  load_w: number;
+}
+
 export const api = {
+  pools: {
+    list: (q: string, archived: boolean) =>
+      request<Pool[]>(`/pools${query({ q, archived: archived || undefined })}`),
+    create: (input: PoolInput) => post<Pool>('/pools', input),
+    update: (id: string, input: PoolInput) => put<Pool>(`/pools/${id}`, input),
+    archive: (id: string) => post<Pool>(`/pools/${id}/archive`),
+    restore: (id: string) => post<Pool>(`/pools/${id}/restore`),
+  },
+  workers: {
+    list: (q: string, archived: boolean) =>
+      request<Worker[]>(`/workers${query({ q, archived: archived || undefined })}`),
+    groups: () => request<string[]>('/workers/groups'),
+    create: (input: WorkerInput) => post<Worker>('/workers', input),
+    update: (id: string, input: WorkerInput) => put<Worker>(`/workers/${id}`, input),
+    archive: (id: string) => post<Worker>(`/workers/${id}/archive`),
+    restore: (id: string) => post<Worker>(`/workers/${id}/restore`),
+  },
+  containers: {
+    list: (q: string) => request<Container[]>(`/containers${query({ q })}`),
+    create: (input: ContainerInput) => post<Container>('/containers', input),
+    update: (id: string, input: ContainerInput) => put<Container>(`/containers/${id}`, input),
+  },
+  modules: {
+    list: (q: string, warehouse: string) => request<Module[]>(`/modules${query({ q, warehouse })}`),
+    locations: () => request<string[]>('/modules/locations'),
+    create: (input: ModuleInput) => post<Module>('/modules', input),
+    update: (id: string, input: ModuleInput) => put<Module>(`/modules/${id}`, input),
+  },
+  map: {
+    get: (warehouse: string) => request<MapData>(`/map${query({ warehouse })}`),
+    shelf: (code: string) => request<ShelfInfo>(`/map/shelf${query({ code })}`),
+    place: (shelf_code: string, device_index: string) =>
+      post<PlaceResult>('/placements', { shelf_code, device_index }),
+    warehouses: () => request<WarehouseSummary[]>('/warehouses'),
+  },
   devices: {
     list: (q: string, archived: boolean) =>
       request<DeviceModel[]>(`/devices${query({ q, archived: archived || undefined })}`),

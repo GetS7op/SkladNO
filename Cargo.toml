@@ -5,6 +5,8 @@ members = [
     "crates/modules/catalog",
     "crates/modules/clients",
     "crates/modules/deliveries",
+    "crates/modules/locations",
+    "crates/modules/whitelists",
 ]
 resolver = "3"
 
@@ -29,3 +31,5 @@ skladno-core = { path = "crates/core" }
 skladno-catalog = { path = "crates/modules/catalog" }
 skladno-clients = { path = "crates/modules/clients" }
 skladno-deliveries = { path = "crates/modules/deliveries" }
+skladno-locations = { path = "crates/modules/locations" }
+skladno-whitelists = { path = "crates/modules/whitelists" }

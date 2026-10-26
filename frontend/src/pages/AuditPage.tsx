@@ -8,6 +8,11 @@ const ENTITY_LABELS: Record<string, string> = {
   device_model: 'Модель устройства',
   client: 'Клиент',
   delivery: 'Поставка',
+  device: 'Устройство',
+  pool: 'Пул',
+  worker: 'Воркер',
+  container: 'Контейнер',
+  module: 'Модуль',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -16,6 +21,8 @@ const ACTION_LABELS: Record<string, string> = {
   archive: 'в архив',
   restore: 'из архива',
   advance: 'смена этапа',
+  place: 'размещение',
+  move: 'перемещение',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -34,9 +41,29 @@ const FIELD_LABELS: Record<string, string> = {
   destination: 'Назначение',
   index_from: 'Index с',
   index_to: 'Index по',
+  device_index: 'Index',
+  location: 'Место',
+  stratum1: 'Стратум 1',
+  stratum2: 'Стратум 2',
+  stratum3: 'Стратум 3',
+  allowed: 'Разрешение',
+  group_name: 'Группа',
+  watcher_url: 'Вотчерлинк',
+  short_name: 'Сокращение',
+  power_kw: 'Мощность, кВт',
+  racks: 'Стеллажей',
+  shelves_per_rack: 'Полок',
+  devices_per_shelf: 'На полку',
+  shelf_dims_mm: 'Полка',
+  description: 'Описание',
+  warehouse: 'Склад',
+  containers: 'Контейнеров',
+  containers_added: 'Добавлены контейнеры',
+  containers_removed: 'Убрано контейнеров',
+  containers_retyped: 'Сменён тип',
 };
 
-const HIDDEN = new Set(['id', 'client_id']);
+const HIDDEN = new Set(['id', 'client_id', 'pool_id']);
 
 /** Журнал действий: когда, кто и что сделал; для изменений — старое и новое значение. */
 export function AuditPage() {
@@ -56,8 +83,13 @@ export function AuditPage() {
           options={[
             { value: '', label: 'Все' },
             { value: 'delivery', label: 'Поставки' },
-            { value: 'device_model', label: 'Устройства' },
+            { value: 'device', label: 'Размещение' },
+            { value: 'device_model', label: 'Модели' },
             { value: 'client', label: 'Клиенты' },
+            { value: 'module', label: 'Модули' },
+            { value: 'container', label: 'Контейнеры' },
+            { value: 'pool', label: 'Пулы' },
+            { value: 'worker', label: 'Воркеры' },
           ]}
         />
       </div>
@@ -117,6 +149,7 @@ function Changes({ entry }: { entry: AuditEntry }) {
 const VALUE_LABELS: Record<string, (value: string) => string> = {
   stage: (v) => stageLabel(v as Stage),
   destination: (v) => destinationLabel(v as Destination),
+  warehouse: (v) => destinationLabel(v as Destination),
 };
 
 function renderValue(value: unknown, label?: (value: string) => string): string {

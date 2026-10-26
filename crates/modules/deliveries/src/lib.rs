@@ -75,6 +75,8 @@ struct DeviceRow {
     device_index: String,
     manufacturer: String,
     model: String,
+    /// Адрес полки MXCXSXP, если устройство уже размещено (F-09).
+    location: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -187,8 +189,13 @@ async fn load(db: &Db, id: Uuid) -> AppResult<DeliveryDetail> {
     .fetch_all(db)
     .await?;
     let devices = sqlx::query_as::<_, DeviceRow>(
-        "SELECT v.id, v.device_index, m.manufacturer, m.model FROM devices v \
-         JOIN device_models m ON m.id = v.model_id WHERE v.delivery_id = $1 ORDER BY v.device_index",
+        "SELECT v.id, v.device_index, m.manufacturer, m.model, \
+         md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location \
+         FROM devices v JOIN device_models m ON m.id = v.model_id \
+         LEFT JOIN device_placements p ON p.device_id = v.id \
+         LEFT JOIN module_containers mc ON mc.id = p.module_container_id \
+         LEFT JOIN modules md ON md.id = mc.module_id \
+         WHERE v.delivery_id = $1 ORDER BY v.device_index",
     )
     .bind(id)
     .fetch_all(db)

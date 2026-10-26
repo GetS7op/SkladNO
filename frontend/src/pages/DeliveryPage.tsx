@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Download, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, type DeliveryDetail } from '../api';
+import { ScanPanel } from '../components/ScanPanel';
 import { ErrorBanner } from '../components/ui';
 import { STAGES, destinationLabel, downloadCsv, formatDate } from '../format';
 import { AuditList } from './AuditPage';
@@ -33,6 +34,12 @@ export function DeliveryPage() {
       </header>
 
       <StageStepper delivery={d} />
+
+      {d.stage === 'receiving' && (
+        <ScanPanel
+          hint={`Шаг 3: сканируйте штрихкод полки склада «${destinationLabel(d.destination)}», затем INDEX с наклейки. Размещено ${placedCount(d)} из ${d.devices.length}.`}
+        />
+      )}
 
       <section className="card">
         <h2>Шапка</h2>
@@ -132,19 +139,25 @@ function StageStepper({ delivery }: { delivery: DeliveryDetail }) {
   );
 }
 
+const placedCount = (d: DeliveryDetail) => d.devices.filter((v) => v.location).length;
+
 function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
   const [filter, setFilter] = useState('');
   const needle = filter.trim().toLowerCase();
   const rows = needle
     ? delivery.devices.filter((v) =>
-        `${v.device_index} ${v.manufacturer} ${v.model} ${v.id}`.toLowerCase().includes(needle),
+        `${v.device_index} ${v.manufacturer} ${v.model} ${v.id} ${v.location ?? ''}`
+          .toLowerCase()
+          .includes(needle),
       )
     : delivery.devices;
 
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Устройства ({delivery.devices.length})</h2>
+        <h2>
+          Устройства ({delivery.devices.length}, размещено {placedCount(delivery)})
+        </h2>
         <label className="search small">
           <Search size={14} />
           <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Index или модель" />
@@ -155,8 +168,8 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
           onClick={() =>
             downloadCsv(
               `${delivery.number}.csv`,
-              ['Index', 'UUID', 'Производитель', 'Модель'],
-              delivery.devices.map((v) => [v.device_index, v.id, v.manufacturer, v.model]),
+              ['Index', 'UUID', 'Производитель', 'Модель', 'Место'],
+              delivery.devices.map((v) => [v.device_index, v.id, v.manufacturer, v.model, v.location]),
             )
           }
         >
@@ -169,6 +182,7 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
             <tr>
               <th>Index</th>
               <th>Модель</th>
+              <th>Место</th>
               <th>UUID</th>
             </tr>
           </thead>
@@ -181,6 +195,7 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
                 <td>
                   {v.manufacturer} {v.model}
                 </td>
+                <td className="mono">{v.location ?? <span className="muted">не размещено</span>}</td>
                 <td className="mono muted">{v.id}</td>
               </tr>
             ))}

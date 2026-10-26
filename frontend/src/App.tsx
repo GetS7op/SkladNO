@@ -14,27 +14,47 @@ import {
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { AuditPage } from './pages/AuditPage';
 import { ClientsPage } from './pages/ClientsPage';
+import { ContainersPage } from './pages/ContainersPage';
 import { DeliveriesPage } from './pages/DeliveriesPage';
 import { DeliveryCreatePage } from './pages/DeliveryCreatePage';
 import { DeliveryPage } from './pages/DeliveryPage';
 import { DevicesPage } from './pages/DevicesPage';
-import { PlannedPage, PLANNED } from './pages/PlannedPage';
+import { MapPage } from './pages/MapPage';
+import { ModulesPage } from './pages/ModulesPage';
+import { PoolsPage } from './pages/PoolsPage';
+import { WarehousesPage } from './pages/WarehousesPage';
+import { WorkersPage } from './pages/WorkersPage';
 
 const NAV = [
-  { to: '/deliveries', label: 'Поставки', icon: PackagePlus },
-  { to: '/devices', label: 'Устройства', icon: Cpu },
-  { to: '/clients', label: 'Клиенты', icon: Users },
-  { to: '/audit', label: 'Журнал', icon: History },
+  {
+    title: 'Учёт',
+    items: [
+      { to: '/deliveries', label: 'Поставки', icon: PackagePlus },
+      { to: '/devices', label: 'Устройства', icon: Cpu },
+      { to: '/clients', label: 'Клиенты', icon: Users },
+    ],
+  },
+  {
+    title: 'Размещение',
+    items: [
+      { to: '/warehouses', label: 'Склады', icon: Warehouse },
+      { to: '/map', label: 'Карта', icon: Map },
+      { to: '/modules', label: 'Модули', icon: Boxes },
+      { to: '/containers', label: 'Контейнеры', icon: Container },
+    ],
+  },
+  {
+    title: 'Мониторинг',
+    items: [
+      { to: '/pools', label: 'Вайтлист пулов', icon: Network },
+      { to: '/workers', label: 'Вайтлист воркеров', icon: Server },
+    ],
+  },
+  {
+    title: 'Система',
+    items: [{ to: '/audit', label: 'Журнал', icon: History }],
+  },
 ];
-
-const PLANNED_ICONS = {
-  pools: Network,
-  workers: Server,
-  warehouses: Warehouse,
-  containers: Container,
-  modules: Boxes,
-  map: Map,
-} as const;
 
 export function App() {
   return (
@@ -49,27 +69,19 @@ export function App() {
             <span>майнинг-ферма</span>
           </span>
         </NavLink>
-        <nav className="primary-nav">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <NavLink key={to} to={to} className="nav-item">
-              <Icon size={18} />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-        <p className="nav-section">Следующий этап</p>
-        <nav className="primary-nav">
-          {PLANNED.map((p) => {
-            const Icon = PLANNED_ICONS[p.slug];
-            return (
-              <NavLink key={p.slug} to={`/planned/${p.slug}`} className="nav-item planned">
-                <Icon size={18} />
-                {p.title}
-                <span className="tag">{p.id}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+        {NAV.map((section) => (
+          <div key={section.title} className="nav-group">
+            <p className="nav-section">{section.title}</p>
+            <nav className="primary-nav">
+              {section.items.map(({ to, label, icon: Icon }) => (
+                <NavLink key={to} to={to} className="nav-item">
+                  <Icon size={18} />
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        ))}
       </aside>
       <main className="workspace">
         <Routes>
@@ -79,8 +91,13 @@ export function App() {
           <Route path="/deliveries/:id" element={<DeliveryPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/warehouses" element={<WarehousesPage />} />
+          <Route path="/map" element={<MapPage />} />
+          <Route path="/modules" element={<ModulesPage />} />
+          <Route path="/containers" element={<ContainersPage />} />
+          <Route path="/pools" element={<PoolsPage />} />
+          <Route path="/workers" element={<WorkersPage />} />
           <Route path="/audit" element={<AuditPage />} />
-          <Route path="/planned/:slug" element={<PlannedPage />} />
           <Route path="*" element={<Navigate to="/deliveries" replace />} />
         </Routes>
       </main>

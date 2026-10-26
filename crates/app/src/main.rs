@@ -42,7 +42,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/audit", get(audit_list))
         .merge(skladno_catalog::router())
         .merge(skladno_clients::router())
-        .merge(skladno_deliveries::router());
+        .merge(skladno_deliveries::router())
+        .merge(skladno_whitelists::router())
+        .merge(skladno_locations::router());
 
     let mut app = Router::new()
         .nest("/api/v1", api)
