@@ -283,7 +283,7 @@ docker compose exec -T app tar -xz -C /srv/skladno < backups/skladno-files-2026-
 |---|---|---|
 | F-01 | Устройства | Реестр «Производитель + Модель», уникальность без учёта регистра, размеры → `AxBxC`, архив вместо удаления |
 | F-02 | Клиенты | Справочник (≥ 3 символов, уникально), счётчики поставок и устройств, выгрузка устройств клиента в CSV |
-| F-03 | Поставки | Шапка + строки, номер `ПУ-ГОД-НОМЕР`, Index по назначению (Парк с 0000001, Мастерская с 9000000), UUID v5 устройств, 4 этапа, состав после создания заморожен; на этапе «Приём поставки» — размещение сканированием |
+| F-03 | Поставки | Шапка + строки, номер `ПУ-ГОД-НОМЕР`, Index по назначению (Парк с 0000001, Мастерская с 9000000), UUID v5 устройств, 4 этапа, состояние (4 значения, таможенные — «Прямо с завода»), предупреждения при подтверждении и закрытии, состав после создания заморожен; на этапе «Приём поставки» — размещение сканированием |
 | F-04 | Вайтлист пулов | 1–3 стратум-линка (минимум один), «Разрешение», архив вместо удаления |
 | F-05 | Вайтлист воркеров | Воркер уникален в пуле, группа создаётся на месте, вотчерлинк |
 | F-06 | Склады | Сводка по Парку и Мастерской: места свободно/занято, ожидают размещения, нагрузка |
@@ -313,17 +313,37 @@ docker compose exec -T app tar -xz -C /srv/skladno < backups/skladno-files-2026-
 
 ### Ещё не сделано
 
-- Онлайн-метрики воркеров («Онлайн», «XP») — нужен доступ к API пулов.
-- «Состояние устройств» (4 значения, признак «таможенные») и «критические ошибки» при закрытии
-  поставки в SPEC не определены.
+- Онлайн-метрики воркеров («Онлайн», «XP») — будущая итерация: свой сканер с API или API
+  действующего сканера ЦОД (решение D-10).
+- Шаблоны поставок для загрузки данных устройств (MAC, серийный номер) — поля у устройств уже есть.
 
 ---
 
 ## Разработка
 
 Стек: Rust 2024 (Axum 0.8, SQLx 0.8, PostgreSQL 18) — модульный монолит: `crates/core` и модули
-`crates/modules/{catalog,clients,deliveries,whitelists,locations}`, сборка в `crates/app`.
-Frontend: React 19, TypeScript, Vite, TanStack Query. Миграции — `migrations/`.
+`crates/modules/{catalog,clients,deliveries,identity,locations,reports,whitelists}`, сборка в
+`crates/app`. Миграции — `migrations/`.
+
+Frontend (React 19, TypeScript, Vite, TanStack Query, zod) устроен как в skladno-pc-old:
+
+```text
+frontend/src/
+  main.tsx, App.tsx, styles.css      точка входа и общие стили
+  core/
+    api/       client.ts (запросы, ApiError, событие 401), queryClient.ts (политика повторов)
+    auth/      AuthProvider, context (useAuth, useMe, useCan), ProtectedRoute, PublicOnlyRoute
+    layout/    AppShell (меню), WorkspaceLayout (<Outlet>), UserMenu, OfflineBanner
+    router/    index.tsx (дерево маршрутов, ленивые страницы), routes.ts (меню и права)
+    ui/        Registry, Modal/Field/Segmented, format, useDebounced
+    domain.ts  общие перечисления: склад, этап, состояние, роль
+  modules/<раздел>/                  те же разделы, что crates backend
+    api.ts     zod-схемы ответов и функции запросов
+    hooks.ts   фабрика ключей запросов и хуки TanStack Query
+    *Page.tsx  страницы, styles.css — стили раздела
+```
+
+Тесты лежат рядом с кодом (`*.test.ts`).
 
 ```bash
 scripts/configure.sh                 # .env со случайным паролем
@@ -337,7 +357,9 @@ npm --prefix frontend run dev        # интерфейс на http://localhost:
 
 ```bash
 cargo test --workspace
+npm --prefix frontend run lint       # ESLint, без предупреждений
 npm --prefix frontend run typecheck
+npm --prefix frontend test           # Vitest
 ```
 
 ## Лицензия

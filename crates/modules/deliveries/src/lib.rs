@@ -3,6 +3,8 @@
 mod files;
 mod index;
 
+pub use index::{device_uuid, format_index};
+
 use std::collections::HashSet;
 
 use axum::{
@@ -28,7 +30,8 @@ const MAX_DEVICES_PER_DELIVERY: i32 = 10_000;
 const CREATE_LOCK: i64 = 7301;
 
 const SUMMARY: &str = "SELECT d.id, d.number, d.client_id, c.name AS client_name, d.device_group, \
-    d.delivery_date, d.basis_doc, d.basis_date, d.destination, d.stage, d.created_at, \
+    d.delivery_date, d.basis_doc, d.basis_date, d.destination, d.stage, d.condition, \
+    (d.condition IS NOT DISTINCT FROM 'factory_new') AS customs, d.created_at, \
     (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices \
     FROM deliveries d JOIN clients c ON c.id = d.client_id";
 
@@ -37,6 +40,28 @@ const SUMMARY: &str = "SELECT d.id, d.number, d.client_id, c.name AS client_name
 enum Destination {
     Park,
     Workshop,
+}
+
+/// D-05: «Состояние» поставки. Таможенные — только «Прямо с завода»,
+/// остальные три зависят от внешнего состояния устройств.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Condition {
+    FactoryNew,
+    SlightlyUsed,
+    FieldTested,
+    BattleHardened,
+}
+
+impl Condition {
+    fn as_str(self) -> &'static str {
+        match self {
+            Condition::FactoryNew => "factory_new",
+            Condition::SlightlyUsed => "slightly_used",
+            Condition::FieldTested => "field_tested",
+            Condition::BattleHardened => "battle_hardened",
+        }
+    }
 }
 
 impl Destination {
@@ -60,6 +85,9 @@ pub struct DeliverySummary {
     basis_date: Option<NaiveDate>,
     destination: String,
     stage: String,
+    /// None — поставка перенесена из старой базы без этих данных.
+    condition: Option<String>,
+    customs: bool,
     created_at: DateTime<Utc>,
     devices: i64,
 }
@@ -82,6 +110,8 @@ struct DeviceRow {
     model: String,
     /// Адрес полки MXCXSXP, если устройство уже размещено (F-09).
     location: Option<String>,
+    mac_address: Option<String>,
+    serial_no: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,6 +138,7 @@ pub struct CreateDelivery {
     basis_doc: Option<String>,
     basis_date: Option<NaiveDate>,
     destination: Destination,
+    condition: Condition,
     lines: Vec<LineInput>,
 }
 
@@ -129,6 +160,7 @@ pub fn router() -> Router<Db> {
         .route("/deliveries/index-ranges", get(index_ranges))
         .route("/deliveries/{id}", get(detail))
         .route("/deliveries/{id}/advance", post(advance))
+        .route("/deliveries/{id}/warnings", get(warnings))
         .merge(files::router())
 }
 
@@ -195,7 +227,7 @@ async fn load(db: &Db, id: Uuid) -> AppResult<DeliveryDetail> {
     .fetch_all(db)
     .await?;
     let devices = sqlx::query_as::<_, DeviceRow>(
-        "SELECT v.id, v.device_index, m.manufacturer, m.model, \
+        "SELECT v.id, v.device_index, m.manufacturer, m.model, v.mac_address, v.serial_no, \
          md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location \
          FROM devices v JOIN device_models m ON m.id = v.model_id \
          LEFT JOIN device_placements p ON p.device_id = v.id \
@@ -303,7 +335,7 @@ async fn create(
 
     let id = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO deliveries (request_id, number, year, seq, client_id, device_group, delivery_date, \
-         basis_doc, basis_date, destination) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
+         basis_doc, basis_date, destination, condition) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
     )
     .bind(input.request_id)
     .bind(&number)
@@ -315,6 +347,7 @@ async fn create(
     .bind(&basis_doc)
     .bind(input.basis_date)
     .bind(destination)
+    .bind(input.condition.as_str())
     .fetch_one(&mut *tx)
     .await?;
 
@@ -404,14 +437,60 @@ async fn advance(
         .bind(next)
         .execute(&mut *tx)
         .await?;
-    audit::record(
-        &mut *tx,
-        "delivery",
-        id,
-        "advance",
-        json!({ "stage": { "old": stage, "new": next } }),
-    )
-    .await?;
+    // Предупреждения не блокируют этап, но фиксируются в журнале: кто и с чем подтвердил.
+    let mut changes = json!({ "stage": { "old": stage, "new": next } });
+    if *next != "receiving" {
+        let warnings = stage_warnings(&mut *tx, id).await?;
+        if !warnings.is_empty() {
+            changes["warnings"] = json!(warnings);
+        }
+    }
+    audit::record(&mut *tx, "delivery", id, "advance", changes).await?;
     tx.commit().await?;
     Ok(Json(load(&db, id).await?))
+}
+
+#[derive(sqlx::FromRow)]
+struct WarningFacts {
+    devices: i64,
+    unplaced: i64,
+    basis_doc: Option<String>,
+    files: i64,
+    condition: Option<String>,
+}
+
+/// Некритические замечания к поставке перед подтверждением и закрытием (SPEC: закрытие
+/// с ними разрешено, пользователь видит их и подтверждает).
+async fn stage_warnings<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> AppResult<Vec<String>> {
+    let f = sqlx::query_as::<_, WarningFacts>(
+        "SELECT (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices, \
+         (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id \
+            AND NOT EXISTS (SELECT 1 FROM device_placements p WHERE p.device_id = v.id)) AS unplaced, \
+         d.basis_doc, (SELECT count(*) FROM delivery_files f WHERE f.delivery_id = d.id) AS files, d.condition \
+         FROM deliveries d WHERE d.id = $1",
+    )
+    .bind(id)
+    .fetch_optional(executor)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Поставка не найдена".into()))?;
+    let mut warnings = Vec::new();
+    if f.unplaced > 0 {
+        warnings.push(format!("Не размещено устройств: {} из {}", f.unplaced, f.devices));
+    }
+    if f.basis_doc.is_none() && f.files == 0 {
+        warnings.push("Нет документа-основания: не указан номер и не прикреплены файлы".into());
+    }
+    if f.condition.is_none() {
+        warnings.push("Не указано состояние поставки".into());
+    }
+    Ok(warnings)
+}
+
+#[derive(Serialize)]
+struct Warnings {
+    warnings: Vec<String>,
+}
+
+async fn warnings(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<Warnings>> {
+    Ok(Json(Warnings { warnings: stage_warnings(&db, id).await? }))
 }

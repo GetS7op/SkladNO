@@ -25,6 +25,16 @@ fn stage(v: &str) -> &'static str {
     }
 }
 
+fn condition(v: Option<&str>) -> &'static str {
+    match v {
+        Some("factory_new") => "Прямо с завода",
+        Some("slightly_used") => "Немного поношенные",
+        Some("field_tested") => "После полевых испытаний",
+        Some("battle_hardened") => "Закаленные в боях",
+        _ => "не указано",
+    }
+}
+
 fn yes_no(v: bool) -> Cell {
     (if v { "да" } else { "нет" }).into()
 }
@@ -125,6 +135,8 @@ struct InventoryRow {
     destination: String,
     stage: String,
     location: Option<String>,
+    mac_address: Option<String>,
+    serial_no: Option<String>,
 }
 
 /// Все физические устройства: Index, модель, клиент, поставка, склад, место.
@@ -132,7 +144,8 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, InventoryRow>(
         "SELECT v.device_index, v.id, m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client, \
          d.number, d.delivery_date, v.destination, d.stage, \
-         md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location \
+         md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location, \
+         v.mac_address, v.serial_no \
          FROM devices v JOIN device_models m ON m.id = v.model_id JOIN deliveries d ON d.id = v.delivery_id \
          JOIN clients c ON c.id = d.client_id LEFT JOIN device_placements p ON p.device_id = v.id \
          LEFT JOIN module_containers mc ON mc.id = p.module_container_id LEFT JOIN modules md ON md.id = mc.module_id \
@@ -156,7 +169,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     Ok(Table {
         title: "Реестр устройств".into(),
         file: "inventory".into(),
-        columns: vec!["Index", "UUID", "Производитель", "Модель", "XP, Th/s", "Потребление, Вт", "Клиент", "Поставка", "Дата поставки", "Склад", "Этап поставки", "Место"],
+        columns: vec!["Index", "UUID", "Производитель", "Модель", "XP, Th/s", "Потребление, Вт", "Клиент", "Поставка", "Дата поставки", "Склад", "Этап поставки", "Место", "MAC", "Серийный номер"],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -173,6 +186,8 @@ async fn inventory(db: &Db) -> AppResult<Table> {
                     destination(&r.destination).into(),
                     stage(&r.stage).into(),
                     r.location.into(),
+                    r.mac_address.into(),
+                    r.serial_no.into(),
                 ]
             })
             .collect(),
@@ -222,13 +237,14 @@ struct DeliveryRow {
     basis_doc: Option<String>,
     destination: String,
     stage: String,
+    condition: Option<String>,
     devices: i64,
     placed: i64,
 }
 
 async fn deliveries(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, DeliveryRow>(
-        "SELECT d.number, d.delivery_date, c.name AS client, d.device_group, d.basis_doc, d.destination, d.stage, \
+        "SELECT d.number, d.delivery_date, c.name AS client, d.device_group, d.basis_doc, d.destination, d.stage, d.condition, \
          (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices, \
          (SELECT count(*) FROM devices v JOIN device_placements p ON p.device_id = v.id WHERE v.delivery_id = d.id) AS placed \
          FROM deliveries d JOIN clients c ON c.id = d.client_id ORDER BY d.year DESC, d.seq DESC",
@@ -241,11 +257,12 @@ async fn deliveries(db: &Db) -> AppResult<Table> {
         ("Размещено".to_string(), rows.iter().map(|r| r.placed).sum::<i64>().into()),
     ];
     stats.extend(tally("Этап", rows.iter().map(|r| stage(&r.stage))));
+    stats.extend(tally("Состояние", rows.iter().map(|r| condition(r.condition.as_deref()))));
     stats.extend(tally("Назначение", rows.iter().map(|r| destination(&r.destination))));
     Ok(Table {
         title: "Поставки".into(),
         file: "deliveries".into(),
-        columns: vec!["Наименование", "Дата", "Клиент", "Группа устройств", "Документ-основание", "Назначение", "Этап", "Устройств", "Размещено"],
+        columns: vec!["Наименование", "Дата", "Клиент", "Группа устройств", "Документ-основание", "Назначение", "Состояние", "Таможенные", "Этап", "Устройств", "Размещено"],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -256,6 +273,8 @@ async fn deliveries(db: &Db) -> AppResult<Table> {
                     r.device_group.into(),
                     r.basis_doc.into(),
                     destination(&r.destination).into(),
+                    condition(r.condition.as_deref()).into(),
+                    yes_no(r.condition.as_deref() == Some("factory_new")),
                     stage(&r.stage).into(),
                     r.devices.into(),
                     r.placed.into(),

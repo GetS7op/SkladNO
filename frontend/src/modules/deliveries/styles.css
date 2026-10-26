@@ -1,0 +1,90 @@
+/* Этапы поставки */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.stage-created {
+  background: #e6e5de;
+  color: #55594f;
+}
+.stage-receiving {
+  background: #f5e8c7;
+  color: #7a5a0c;
+}
+.stage-confirmation {
+  background: #dbe7f3;
+  color: #2d5784;
+}
+.stage-closed {
+  background: #e3ecd2;
+  color: var(--accent-strong);
+}
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stepper li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-weight: 600;
+  background: var(--page);
+}
+.stepper .dot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  font-size: 12px;
+}
+.stepper li.done {
+  color: var(--text);
+}
+.stepper li.done .dot {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+.stepper li.current {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.stepper li.current .dot {
+  border-color: var(--accent-ink);
+}
+
+/* Файлы поставки */
+.files {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.files li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.files a {
+  font-weight: 600;
+}
+
+/* Состояние поставки */
+.badge.customs {
+  margin-left: 6px;
+}

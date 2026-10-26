@@ -1,23 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import './styles.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
-import { App } from './App';
-import { AuthGate } from './auth';
-import './styles.css';
-
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
-});
+import App from './App';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AuthGate>
-          <App />
-        </AuthGate>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <App />
   </StrictMode>,
 );
