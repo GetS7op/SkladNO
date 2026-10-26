@@ -1,0 +1,2 @@
+# SkladNO
+Equipment tracking system
