@@ -1041,6 +1041,41 @@ button.cell:hover {
   color: var(--danger);
 }
 
+/* Импорт и экспорт */
+.export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.file-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.file-input:hover {
+  border-color: var(--accent-strong);
+}
+.file-input input {
+  display: none;
+}
+.banner.warn-banner {
+  background: #f5e8c7;
+  color: #7a5a0c;
+}
+.import-errors {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  max-height: 200px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;

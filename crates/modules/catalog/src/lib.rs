@@ -31,12 +31,12 @@ pub struct DeviceModel {
 
 #[derive(Debug, Deserialize)]
 pub struct DeviceModelInput {
-    manufacturer: String,
-    model: String,
-    hashrate_ths: Option<f64>,
-    power_w: Option<i32>,
-    dimensions_mm: Option<String>,
-    weight_kg: Option<String>,
+    pub manufacturer: String,
+    pub model: String,
+    pub hashrate_ths: Option<f64>,
+    pub power_w: Option<i32>,
+    pub dimensions_mm: Option<String>,
+    pub weight_kg: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -200,4 +200,28 @@ async fn fetch_for_update(
         .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(|| AppError::NotFound("Модель не найдена".into()))
+}
+
+/// Импорт одной модели (по тем же правилам, что ручной ввод): true — создана, false — такая уже есть.
+pub async fn import_one(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    input: DeviceModelInput,
+) -> AppResult<bool> {
+    let input = validate(input)?;
+    let row = sqlx::query_as::<_, DeviceModel>(
+        "INSERT INTO device_models (manufacturer, model, hashrate_ths, power_w, dimensions_mm, weight_kg) \
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING \
+         RETURNING id, manufacturer, model, hashrate_ths, power_w, dimensions_mm, weight_kg, archived",
+    )
+    .bind(&input.manufacturer)
+    .bind(&input.model)
+    .bind(input.hashrate_ths)
+    .bind(input.power_w)
+    .bind(&input.dimensions_mm)
+    .bind(&input.weight_kg)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(row) = row else { return Ok(false) };
+    audit::record(&mut **tx, "device_model", row.id, "import", json!(row)).await?;
+    Ok(true)
 }

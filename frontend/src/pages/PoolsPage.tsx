@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Archive, ArchiveRestore, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Pool, type PoolInput } from '../api';
+import { exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { useDebounced } from '../hooks';
@@ -52,6 +53,7 @@ export function PoolsPage() {
             icon: <Plus size={16} />,
             onClick: () => setEditing('new'),
           },
+          ...exportOptions('pools'),
         ]}
         filters={
           <Segmented

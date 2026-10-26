@@ -378,3 +378,11 @@ export const api = {
       request<AuditEntry[]>(`/audit${query({ entity, entity_id })}`),
   },
 };
+
+export interface ImportReport {
+  dry_run: boolean;
+  total: number;
+  created: number;
+  skipped: number;
+  errors: { row: number; message: string }[];
+}

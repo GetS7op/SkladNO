@@ -18,6 +18,24 @@ const SELECT: &str = "SELECT c.id, c.name, c.note, \
     (SELECT count(*) FROM devices v JOIN deliveries d ON d.id = v.delivery_id WHERE d.client_id = c.id) AS devices \
     FROM clients c";
 
+/// Импорт одного клиента (по тем же правилам, что ручной ввод): true — создан, false — такой уже есть.
+pub async fn import_one(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    input: ClientInput,
+) -> AppResult<bool> {
+    let fields = validate(input)?;
+    let id = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO clients (name, note) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING id",
+    )
+    .bind(&fields.name)
+    .bind(&fields.note)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(id) = id else { return Ok(false) };
+    audit::record(&mut **tx, "client", id, "import", json!(fields)).await?;
+    Ok(true)
+}
+
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct Client {
     id: Uuid,
@@ -35,8 +53,8 @@ struct ClientFields {
 
 #[derive(Debug, Deserialize)]
 pub struct ClientInput {
-    name: String,
-    note: Option<String>,
+    pub name: String,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

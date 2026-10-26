@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, Download, Plus } from 'lucide-react';
+import { Archive, ArchiveRestore, FileUp, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type DeviceModel, type DeviceModelInput } from '../api';
+import { ImportDialog, exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
-import { downloadCsv, formatDimensions, formatNumber } from '../format';
+import { formatDimensions, formatNumber } from '../format';
 import { useDebounced } from '../hooks';
 import { useCan } from '../auth';
 
@@ -22,6 +23,7 @@ type Editing = { mode: 'create' } | { mode: 'edit'; row: DeviceModel };
 /** F-01. Реестр устройств и характеристик. */
 export function DevicesPage() {
   const canEdit = useCan('senior');
+  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archive'>('active');
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -47,22 +49,12 @@ export function DevicesPage() {
             onClick: () => setEditing({ mode: 'create' }),
           },
           {
-            label: 'Экспорт CSV',
-            icon: <Download size={16} />,
-            onClick: () =>
-              downloadCsv(
-                'devices.csv',
-                ['Производитель', 'Модель', 'XP, Th/s', 'Потребление, Вт', 'Размеры, мм', 'Вес, кг'],
-                (list.data ?? []).map((r) => [
-                  r.manufacturer,
-                  r.model,
-                  r.hashrate_ths,
-                  r.power_w,
-                  r.dimensions_mm,
-                  r.weight_kg,
-                ]),
-              ),
+            label: 'Импорт из CSV / XLSX',
+            hidden: !canEdit,
+            icon: <FileUp size={16} />,
+            onClick: () => setImporting(true),
           },
+          ...exportOptions('devices'),
         ]}
         filters={
           <Segmented
@@ -82,6 +74,7 @@ export function DevicesPage() {
         onRowClick={(row) => setEditing({ mode: 'edit', row })}
         empty={archived ? 'В архиве пусто' : 'Моделей пока нет — добавьте через ~option'}
       />
+      {importing && <ImportDialog registry="devices" onClose={() => setImporting(false)} />}
       {editing && <DeviceForm editing={editing} onClose={() => setEditing(null)} />}
     </>
   );

@@ -48,6 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(skladno_whitelists::router())
         .merge(skladno_locations::router())
         .merge(skladno_identity::router())
+        .merge(skladno_reports::router())
         .route_layer(axum::middleware::from_fn_with_state(db.clone(), access::guard));
 
     let mut app = Router::new()

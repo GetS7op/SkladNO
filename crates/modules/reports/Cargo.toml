@@ -1,0 +1,18 @@
+[package]
+name = "skladno-reports"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+axum.workspace = true
+calamine = "0.37"
+chrono.workspace = true
+encoding_rs = "0.8"
+rust_xlsxwriter = "0.101"
+serde.workspace = true
+serde_json.workspace = true
+skladno-catalog.workspace = true
+skladno-clients.workspace = true
+skladno-core.workspace = true
+sqlx.workspace = true
+uuid.workspace = true

@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, Plus } from 'lucide-react';
+import { Download, FileUp, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Client, type ClientInput } from '../api';
+import { ImportDialog, exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal } from '../components/ui';
-import { downloadCsv } from '../format';
 import { useDebounced } from '../hooks';
 import { useCan } from '../auth';
 
@@ -42,6 +42,7 @@ const COLUMNS: Column<Client>[] = [
 /** F-02. Клиенты: без удаления и архива, только редактирование. */
 export function ClientsPage() {
   const canEdit = useCan('senior');
+  const [importing, setImporting] = useState(false);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Client | 'new' | null>(null);
   const q = useDebounced(search);
@@ -62,15 +63,12 @@ export function ClientsPage() {
             onClick: () => setEditing('new'),
           },
           {
-            label: 'Экспорт CSV',
-            icon: <Download size={16} />,
-            onClick: () =>
-              downloadCsv(
-                'clients.csv',
-                ['Наименование', 'Заметка', 'Поставок', 'Устройств'],
-                (list.data ?? []).map((r) => [r.name, r.note, r.deliveries, r.devices]),
-              ),
+            label: 'Импорт из CSV / XLSX',
+            hidden: !canEdit,
+            icon: <FileUp size={16} />,
+            onClick: () => setImporting(true),
           },
+          ...exportOptions('clients'),
         ]}
         columns={COLUMNS}
         rows={list.data}
@@ -80,6 +78,7 @@ export function ClientsPage() {
         onRowClick={setEditing}
         empty="Клиентов пока нет — добавьте через ~option"
       />
+      {importing && <ImportDialog registry="clients" onClose={() => setImporting(false)} />}
       {editing && <ClientForm client={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </>
   );

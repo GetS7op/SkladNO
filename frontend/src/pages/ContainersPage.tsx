@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { api, type Container, type ContainerInput } from '../api';
+import { exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal } from '../components/ui';
 import { formatDimensions, formatNumber } from '../format';
@@ -47,6 +48,7 @@ export function ContainersPage() {
             icon: <Plus size={16} />,
             onClick: () => setEditing('new'),
           },
+          ...exportOptions('containers'),
         ]}
         columns={COLUMNS}
         rows={list.data}

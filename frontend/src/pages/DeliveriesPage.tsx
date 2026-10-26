@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, type DeliverySummary } from '../api';
+import { exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { STAGES, destinationLabel, formatDate } from '../format';
 import { useDebounced } from '../hooks';
@@ -35,6 +36,7 @@ export function DeliveriesPage() {
       onSearch={setSearch}
       options={[
         { label: 'Новая поставка', icon: <Plus size={16} />, onClick: () => navigate('/deliveries/new') },
+        ...exportOptions('deliveries'),
       ]}
       filters={
         <select value={stage} onChange={(e) => setStage(e.target.value)} aria-label="Состояние">

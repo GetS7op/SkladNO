@@ -16,7 +16,7 @@ POSTGRES_PASSWORD=${password}
 POSTGRES_PORT=${port}
 DATABASE_URL=postgres://skladno:${password}@127.0.0.1:${port}/skladno
 BIND=127.0.0.1:8090
-# HTTPS: IP сервера в сети фермы и необязательные имена через пробел (если есть DNS), например skladno.local
+# HTTPS: IP сервера в сети фермы и необязательные имена через пробел (нужна DNS-запись на IP сервера), например apatity.skladno.org
 SKLADNO_IP=${ip_address}
 SKLADNO_NAMES=
 EOF

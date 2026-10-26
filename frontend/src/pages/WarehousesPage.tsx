@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { Download } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { download, exportUrl } from '../components/ExportImport';
 import { api } from '../api';
 import { destinationLabel, formatNumber } from '../format';
 
@@ -15,6 +17,19 @@ export function WarehousesPage() {
           <p className="muted">
             Парк и Мастерская: вместимость, занятость и нагрузка по карте местоположений
           </p>
+        </div>
+        <div className="export-buttons">
+          <span className="muted small">Реестр всех устройств:</span>
+          {(['xlsx', 'csv', 'md'] as const).map((format) => (
+            <button
+              key={format}
+              type="button"
+              className="btn ghost"
+              onClick={() => download(exportUrl('inventory', format))}
+            >
+              <Download size={16} /> {format.toUpperCase()}
+            </button>
+          ))}
         </div>
       </header>
       {summary.isPending && <p className="muted">Загрузка…</p>}

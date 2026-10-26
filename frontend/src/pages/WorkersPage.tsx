@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, ExternalLink, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, type Worker, type WorkerInput } from '../api';
+import { exportOptions } from '../components/ExportImport';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { useDebounced } from '../hooks';
@@ -74,6 +75,7 @@ export function WorkersPage() {
             icon: <Plus size={16} />,
             onClick: () => setEditing('new'),
           },
+          ...exportOptions('workers'),
         ]}
         filters={
           <Segmented
