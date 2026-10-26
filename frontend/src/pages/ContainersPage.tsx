@@ -6,6 +6,7 @@ import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal } from '../components/ui';
 import { formatDimensions, formatNumber } from '../format';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const COLUMNS: Column<Container>[] = [
   { key: 'name', title: 'Наименование', render: (r) => <b>{r.name}</b> },
@@ -26,6 +27,7 @@ const COLUMNS: Column<Container>[] = [
 
 /** F-07. Контейнеры (шаблоны). */
 export function ContainersPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Container | 'new' | null>(null);
   const q = useDebounced(search);
@@ -38,7 +40,14 @@ export function ContainersPage() {
         subtitle="Шаблоны контейнеров: мощность, стеллажи, полки и вместимость"
         search={search}
         onSearch={setSearch}
-        options={[{ label: 'Новый контейнер', icon: <Plus size={16} />, onClick: () => setEditing('new') }]}
+        options={[
+          {
+            label: 'Новый контейнер',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing('new'),
+          },
+        ]}
         columns={COLUMNS}
         rows={list.data}
         loading={list.isPending}

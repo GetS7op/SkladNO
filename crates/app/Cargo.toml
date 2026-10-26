@@ -12,6 +12,7 @@ skladno-catalog.workspace = true
 skladno-clients.workspace = true
 skladno-core.workspace = true
 skladno-deliveries.workspace = true
+skladno-identity.workspace = true
 skladno-locations.workspace = true
 skladno-whitelists.workspace = true
 sqlx.workspace = true

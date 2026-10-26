@@ -8,10 +8,14 @@ import {
   Network,
   PackagePlus,
   Server,
+  ShieldCheck,
   Users,
   Warehouse,
 } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { useCan } from './auth';
+import { OfflineBanner } from './components/OfflineBanner';
+import { UserMenu } from './components/UserMenu';
 import { AuditPage } from './pages/AuditPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { ContainersPage } from './pages/ContainersPage';
@@ -22,6 +26,7 @@ import { DevicesPage } from './pages/DevicesPage';
 import { MapPage } from './pages/MapPage';
 import { ModulesPage } from './pages/ModulesPage';
 import { PoolsPage } from './pages/PoolsPage';
+import { UsersPage } from './pages/UsersPage';
 import { WarehousesPage } from './pages/WarehousesPage';
 import { WorkersPage } from './pages/WorkersPage';
 
@@ -52,11 +57,15 @@ const NAV = [
   },
   {
     title: 'Система',
-    items: [{ to: '/audit', label: 'Журнал', icon: History }],
+    items: [
+      { to: '/audit', label: 'Журнал', icon: History },
+      { to: '/users', label: 'Пользователи', icon: ShieldCheck, admin: true },
+    ],
   },
 ];
 
 export function App() {
+  const isAdmin = useCan('admin');
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -73,17 +82,21 @@ export function App() {
           <div key={section.title} className="nav-group">
             <p className="nav-section">{section.title}</p>
             <nav className="primary-nav">
-              {section.items.map(({ to, label, icon: Icon }) => (
-                <NavLink key={to} to={to} className="nav-item">
-                  <Icon size={18} />
-                  {label}
-                </NavLink>
-              ))}
+              {section.items
+                .filter((item) => !('admin' in item) || isAdmin)
+                .map(({ to, label, icon: Icon }) => (
+                  <NavLink key={to} to={to} className="nav-item">
+                    <Icon size={18} />
+                    {label}
+                  </NavLink>
+                ))}
             </nav>
           </div>
         ))}
+        <UserMenu />
       </aside>
       <main className="workspace">
+        <OfflineBanner />
         <Routes>
           <Route path="/" element={<Navigate to="/deliveries" replace />} />
           <Route path="/deliveries" element={<DeliveriesPage />} />
@@ -98,6 +111,7 @@ export function App() {
           <Route path="/pools" element={<PoolsPage />} />
           <Route path="/workers" element={<WorkersPage />} />
           <Route path="/audit" element={<AuditPage />} />
+          {isAdmin && <Route path="/users" element={<UsersPage />} />}
           <Route path="*" element={<Navigate to="/deliveries" replace />} />
         </Routes>
       </main>

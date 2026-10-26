@@ -15,6 +15,10 @@ pub enum AppError {
     Validation(String),
     #[error("{0}")]
     Conflict(String),
+    #[error("Требуется вход")]
+    Unauthorized,
+    #[error("{0}")]
+    Forbidden(String),
     #[error("database error: {0}")]
     Db(#[from] sqlx::Error),
 }
@@ -41,6 +45,8 @@ impl IntoResponse for AppError {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.clone()),
             AppError::Validation(m) => (StatusCode::UNPROCESSABLE_ENTITY, "validation", m.clone()),
             AppError::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.clone()),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", self.to_string()),
+            AppError::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.clone()),
             AppError::Db(e) => {
                 tracing::error!(error = %e, "database error");
                 (

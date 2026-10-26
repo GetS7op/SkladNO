@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Download, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api, type DeliveryDetail } from '../api';
+import { useCan } from '../auth';
 import { ScanPanel } from '../components/ScanPanel';
 import { ErrorBanner } from '../components/ui';
 import { STAGES, destinationLabel, downloadCsv, formatDate } from '../format';
@@ -97,6 +98,7 @@ export function DeliveryPage() {
 
 function StageStepper({ delivery }: { delivery: DeliveryDetail }) {
   const queryClient = useQueryClient();
+  const isSenior = useCan('senior');
   const current = STAGES.findIndex((s) => s.value === delivery.stage);
   const next = STAGES[current + 1];
   const advance = useMutation({
@@ -120,7 +122,10 @@ function StageStepper({ delivery }: { delivery: DeliveryDetail }) {
         ))}
       </ol>
       <ErrorBanner error={advance.error} />
-      {next && (
+      {next && next.value !== 'receiving' && !isSenior && (
+        <p className="muted small stepper-action">Подтверждение и закрытие поставки выполняет Старший СА.</p>
+      )}
+      {next && (next.value === 'receiving' || isSenior) && (
         <div className="stepper-action">
           <button
             type="button"

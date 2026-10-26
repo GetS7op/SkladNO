@@ -1,5 +1,7 @@
 //! Точка входа SkladNO: конфигурация, миграции, сборка модулей в один API.
 
+mod access;
+
 use std::net::SocketAddr;
 
 use axum::{
@@ -44,7 +46,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(skladno_clients::router())
         .merge(skladno_deliveries::router())
         .merge(skladno_whitelists::router())
-        .merge(skladno_locations::router());
+        .merge(skladno_locations::router())
+        .merge(skladno_identity::router())
+        .route_layer(axum::middleware::from_fn_with_state(db.clone(), access::guard));
 
     let mut app = Router::new()
         .nest("/api/v1", api)

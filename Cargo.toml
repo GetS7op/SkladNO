@@ -5,6 +5,7 @@ members = [
     "crates/modules/catalog",
     "crates/modules/clients",
     "crates/modules/deliveries",
+    "crates/modules/identity",
     "crates/modules/locations",
     "crates/modules/whitelists",
 ]
@@ -15,10 +16,13 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
+argon2 = "0.5"
 axum = "=0.8.9"
+hex = "0.4"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "migrate"] }
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }
@@ -31,5 +35,6 @@ skladno-core = { path = "crates/core" }
 skladno-catalog = { path = "crates/modules/catalog" }
 skladno-clients = { path = "crates/modules/clients" }
 skladno-deliveries = { path = "crates/modules/deliveries" }
+skladno-identity = { path = "crates/modules/identity" }
 skladno-locations = { path = "crates/modules/locations" }
 skladno-whitelists = { path = "crates/modules/whitelists" }

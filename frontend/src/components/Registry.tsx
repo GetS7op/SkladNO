@@ -14,6 +14,8 @@ export interface OptionItem {
   label: string;
   icon?: ReactNode;
   onClick: () => void;
+  /** Пункт скрыт, если у роли нет права на действие. */
+  hidden?: boolean;
 }
 
 interface RegistryProps<T> {
@@ -58,7 +60,9 @@ export function Registry<T>(props: RegistryProps<T>) {
             aria-label="Поиск"
           />
         </label>
-        <OptionMenu items={props.options} />
+        {props.options.some((o) => !o.hidden) && (
+          <OptionMenu items={props.options.filter((o) => !o.hidden)} />
+        )}
         {props.filters && <div className="filters">{props.filters}</div>}
       </div>
       <div className="table-wrap">

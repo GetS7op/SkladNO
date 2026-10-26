@@ -13,7 +13,11 @@ use axum::{
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use skladno_core::{AppError, AppResult, Db, audit, text};
+use skladno_core::{
+    AppError, AppResult, Db, audit,
+    auth::{self, Role},
+    text,
+};
 use uuid::Uuid;
 
 /// Этапы поставки по порядку; переход только на следующий.
@@ -389,6 +393,10 @@ async fn advance(
     let Some(next) = STAGES.get(position + 1) else {
         return Err(AppError::Conflict("Поставка уже закрыта".into()));
     };
+    // Шаг 4 SPEC: подтверждение и закрытие поставки — Старший СА.
+    if *next != "receiving" {
+        auth::require(Role::Senior, "Подтверждение и закрытие поставки")?;
+    }
     sqlx::query("UPDATE deliveries SET stage = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(next)

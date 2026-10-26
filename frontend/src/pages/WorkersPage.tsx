@@ -6,6 +6,7 @@ import { api, type Worker, type WorkerInput } from '../api';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const ONLINE_PENDING = 'Появится с подключением к API пулов';
 
@@ -51,6 +52,7 @@ const COLUMNS: Column<Worker>[] = [
 
 /** F-05. Вайтлист воркеров. */
 export function WorkersPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archive'>('active');
   const [editing, setEditing] = useState<Worker | 'new' | null>(null);
@@ -65,7 +67,14 @@ export function WorkersPage() {
         subtitle="Воркеры по пулам и группам для онлайн-проверки"
         search={search}
         onSearch={setSearch}
-        options={[{ label: 'Новый воркер', icon: <Plus size={16} />, onClick: () => setEditing('new') }]}
+        options={[
+          {
+            label: 'Новый воркер',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing('new'),
+          },
+        ]}
         filters={
           <Segmented
             value={view}

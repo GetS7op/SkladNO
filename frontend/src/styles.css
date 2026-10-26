@@ -906,6 +906,141 @@ button.cell:hover {
   text-align: right;
 }
 
+/* Вход и регистрация */
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--sidebar);
+}
+.auth-card {
+  display: grid;
+  gap: 14px;
+  width: min(640px, 100%);
+  padding: 32px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.35);
+}
+.auth-card > p {
+  margin: 0;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+}
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+.btn.wide {
+  width: 100%;
+  justify-content: center;
+}
+.banner.ok {
+  background: #eef4e1;
+  color: var(--accent-ink);
+  line-height: 1.6;
+}
+.copy-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+.copy-value code {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+  word-break: break-all;
+  user-select: all;
+}
+
+/* Пользователь в меню */
+.user-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 14px 10px 0;
+  border-top: 1px solid #292c24;
+}
+.user-card > div:first-child {
+  padding: 0 12px;
+}
+.user-card b {
+  display: block;
+  font-size: 14px;
+}
+.user-card span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #878b80;
+}
+.user-actions {
+  display: grid;
+  gap: 2px;
+}
+.user-actions .nav-item {
+  min-height: 34px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+}
+
+/* Офлайн и очередь сканов */
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f5e8c7;
+  color: #7a5a0c;
+  font-weight: 600;
+}
+.queue-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border-radius: 10px;
+  background: #f5e8c7;
+  color: #7a5a0c;
+  font-size: 13px;
+  font-weight: 700;
+}
+.queue-badge .btn {
+  height: 30px;
+  color: inherit;
+}
+.scan-log li.queued {
+  background: #f5e8c7;
+  color: #7a5a0c;
+}
+.scan-log li .icon-btn {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  color: inherit;
+}
+.rejected {
+  display: grid;
+  gap: 6px;
+}
+.rejected h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;

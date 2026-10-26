@@ -5,6 +5,7 @@ import { api, type Pool, type PoolInput } from '../api';
 import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const COLUMNS: Column<Pool>[] = [
   { key: 'name', title: 'Наименование пула', render: (r) => <b>{r.name}</b> },
@@ -29,6 +30,7 @@ const COLUMNS: Column<Pool>[] = [
 
 /** F-04. Вайтлист пулов. */
 export function PoolsPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archive'>('active');
   const [editing, setEditing] = useState<Pool | 'new' | null>(null);
@@ -43,7 +45,14 @@ export function PoolsPage() {
         subtitle="Пулы и стратум-линки для шаблонов настроек"
         search={search}
         onSearch={setSearch}
-        options={[{ label: 'Новый пул', icon: <Plus size={16} />, onClick: () => setEditing('new') }]}
+        options={[
+          {
+            label: 'Новый пул',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing('new'),
+          },
+        ]}
         filters={
           <Segmented
             value={view}

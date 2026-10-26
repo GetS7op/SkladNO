@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-/// Пока нет входа по приглашениям, все действия записываются от имени системы.
+/// Автор действий без пользователя (служебные операции).
 pub const SYSTEM_ACTOR: &str = "system";
 
 pub async fn record<'e, E>(
@@ -20,7 +20,7 @@ where
     sqlx::query(
         "INSERT INTO audit_log (actor, entity, entity_id, action, changes) VALUES ($1, $2, $3, $4, $5)",
     )
-    .bind(SYSTEM_ACTOR)
+    .bind(crate::auth::current().map_or_else(|| SYSTEM_ACTOR.to_string(), |u| u.login))
     .bind(entity)
     .bind(entity_id)
     .bind(action)

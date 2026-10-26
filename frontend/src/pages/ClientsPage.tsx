@@ -6,6 +6,7 @@ import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal } from '../components/ui';
 import { downloadCsv } from '../format';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const ONLINE_PENDING = 'Появится вместе с вайтлистом воркеров (F-05)';
 
@@ -40,6 +41,7 @@ const COLUMNS: Column<Client>[] = [
 
 /** F-02. Клиенты: без удаления и архива, только редактирование. */
 export function ClientsPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Client | 'new' | null>(null);
   const q = useDebounced(search);
@@ -53,7 +55,12 @@ export function ClientsPage() {
         search={search}
         onSearch={setSearch}
         options={[
-          { label: 'Новый клиент', icon: <Plus size={16} />, onClick: () => setEditing('new') },
+          {
+            label: 'Новый клиент',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing('new'),
+          },
           {
             label: 'Экспорт CSV',
             icon: <Download size={16} />,

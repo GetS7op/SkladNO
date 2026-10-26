@@ -7,6 +7,7 @@ import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { DESTINATIONS, destinationLabel } from '../format';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const COLUMNS: Column<Module>[] = [
   { key: 'number', title: '№ модуля', render: (r) => <b className="mono">{r.number}</b> },
@@ -32,6 +33,7 @@ const COLUMNS: Column<Module>[] = [
 
 /** F-08. Реестр модулей. */
 export function ModulesPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [warehouse, setWarehouse] = useState('');
   const [editing, setEditing] = useState<Module | 'new' | null>(null);
@@ -48,7 +50,14 @@ export function ModulesPage() {
         subtitle="Модуль — набор экземпляров контейнеров; номера входят в адрес MXCXSXP"
         search={search}
         onSearch={setSearch}
-        options={[{ label: 'Новый модуль', icon: <Plus size={16} />, onClick: () => setEditing('new') }]}
+        options={[
+          {
+            label: 'Новый модуль',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing('new'),
+          },
+        ]}
         filters={
           <Segmented
             value={warehouse}

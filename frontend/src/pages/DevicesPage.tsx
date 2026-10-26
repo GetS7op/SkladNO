@@ -6,6 +6,7 @@ import { type Column, Registry } from '../components/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../components/ui';
 import { downloadCsv, formatDimensions, formatNumber } from '../format';
 import { useDebounced } from '../hooks';
+import { useCan } from '../auth';
 
 const COLUMNS: Column<DeviceModel>[] = [
   { key: 'manufacturer', title: 'Производитель', render: (r) => r.manufacturer },
@@ -20,6 +21,7 @@ type Editing = { mode: 'create' } | { mode: 'edit'; row: DeviceModel };
 
 /** F-01. Реестр устройств и характеристик. */
 export function DevicesPage() {
+  const canEdit = useCan('senior');
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'active' | 'archive'>('active');
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -38,7 +40,12 @@ export function DevicesPage() {
         search={search}
         onSearch={setSearch}
         options={[
-          { label: 'Новая модель', icon: <Plus size={16} />, onClick: () => setEditing({ mode: 'create' }) },
+          {
+            label: 'Новая модель',
+            hidden: !canEdit,
+            icon: <Plus size={16} />,
+            onClick: () => setEditing({ mode: 'create' }),
+          },
           {
             label: 'Экспорт CSV',
             icon: <Download size={16} />,

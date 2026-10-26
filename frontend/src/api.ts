@@ -20,10 +20,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       // ответ без JSON — оставляем общее сообщение
     }
+    // Сессия истекла или пользователя отключили — показываем форму входа.
+    if (response.status === 401 && !path.startsWith('/auth/')) {
+      window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+    }
     throw new ApiError(message, response.status);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
+
+export const UNAUTHORIZED_EVENT = 'skladno:unauthorized';
 
 function query(params: Record<string, string | boolean | undefined>): string {
   const search = new URLSearchParams();
@@ -243,7 +250,70 @@ export interface WarehouseSummary {
   load_w: number;
 }
 
+export type Role = 'operator' | 'senior' | 'admin';
+
+export interface Me {
+  id: string;
+  login: string;
+  last_name: string;
+  first_name: string;
+  middle_name: string;
+  email: string;
+  telegram: string | null;
+  role: Role;
+}
+
+export interface ProfileInput {
+  login: string;
+  last_name: string;
+  first_name: string;
+  middle_name: string;
+  email: string;
+  telegram: string | null;
+  password: string;
+}
+
+export interface User extends Me {
+  active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface Invite {
+  id: string;
+  role: Role;
+  note: string | null;
+  expires_at: string | null;
+  created_at: string;
+  created_by_login: string;
+  used_at: string | null;
+  used_by_login: string | null;
+  revoked_at: string | null;
+  status: 'active' | 'used' | 'expired' | 'revoked';
+}
+
 export const api = {
+  auth: {
+    status: () => request<{ needs_setup: boolean; user: Me | null }>('/auth/status'),
+    setup: (input: ProfileInput) => post<Me>('/auth/setup', input),
+    login: (login: string, password: string) => post<Me>('/auth/login', { login, password }),
+    logout: () => post<void>('/auth/logout'),
+    invite: (token: string) =>
+      request<{ role: Role; expires_at: string | null }>(`/auth/invites/${encodeURIComponent(token)}`),
+    register: (token: string, input: ProfileInput) => post<Me>('/auth/register', { token, ...input }),
+    changePassword: (current: string, next: string) => post<void>('/auth/password', { current, new: next }),
+  },
+  users: {
+    list: () => request<User[]>('/users'),
+    update: (id: string, role: Role, active: boolean) => put<User>(`/users/${id}`, { role, active }),
+    resetPassword: (id: string) => post<{ password: string }>(`/users/${id}/reset-password`),
+  },
+  invites: {
+    list: () => request<Invite[]>('/invites'),
+    create: (role: Role, days: number | null, note: string | null) =>
+      post<{ invite: Invite; path: string }>('/invites', { role, days, note }),
+    revoke: (id: string) => post<void>(`/invites/${id}/revoke`),
+  },
   pools: {
     list: (q: string, archived: boolean) =>
       request<Pool[]>(`/pools${query({ q, archived: archived || undefined })}`),
