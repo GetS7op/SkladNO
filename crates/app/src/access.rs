@@ -20,7 +20,8 @@ fn required_role(method: &Method, path: &str) -> Option<Role> {
     if path.starts_with("/users") || path.starts_with("/invites") {
         return Some(Role::Admin);
     }
-    if path == "/settings" && method != Method::GET {
+    // Настройки и склады (маски INDEX) меняет только администратор.
+    if (path == "/settings" || path.starts_with("/warehouses")) && method != Method::GET {
         return Some(Role::Admin);
     }
     if method == Method::GET || method == Method::HEAD {
@@ -75,6 +76,9 @@ mod tests {
         assert_eq!(required_role(&get, "/health"), None);
         assert_eq!(required_role(&post, "/auth/login"), None);
         assert_eq!(required_role(&get, "/devices"), Some(Role::Operator));
+        assert_eq!(required_role(&get, "/warehouses"), Some(Role::Operator));
+        assert_eq!(required_role(&post, "/warehouses"), Some(Role::Admin));
+        assert_eq!(required_role(&put, "/warehouses/w1"), Some(Role::Admin));
         assert_eq!(required_role(&post, "/deliveries"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/placements"), Some(Role::Operator));
         assert_eq!(

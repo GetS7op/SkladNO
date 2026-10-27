@@ -3,7 +3,6 @@ import { ArrowLeft, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCan } from '../../core/auth/context';
-import { destinationLabel } from '../../core/domain';
 import { formatDate, formatDateTime, formatNumber } from '../../core/ui/format';
 import { ErrorBanner, Field, Modal } from '../../core/ui/ui';
 import { AuditList } from '../audit/AuditPage';
@@ -67,7 +66,7 @@ export function DevicePage() {
             от {formatDate(d.delivery_date)} <StageBadge stage={d.stage} />
           </dd>
           <dt>Склад</dt>
-          <dd>{destinationLabel(d.destination)}</dd>
+          <dd>{d.destination_name}</dd>
           <dt>Место</dt>
           <dd>
             {d.location ? (

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { apiGet, apiPost, apiPut, withQuery } from '../../core/api/client';
 import { type Destination, destinationSchema } from '../../core/domain';
+import { formatIndex } from '../../core/ui/format';
 
 /** F-07: шаблон контейнера. */
 const containerSchema = z.object({
@@ -31,8 +32,9 @@ const moduleInstanceSchema = z.object({
 const moduleSchema = z.object({
   id: z.string(),
   number: z.number().int(),
-  location: z.string().nullable(),
+  /** Расположение модуля — склад. */
   warehouse: destinationSchema,
+  warehouse_name: z.string(),
   containers: z.array(moduleInstanceSchema),
   capacity: z.number().int(),
   placed: z.number().int(),
@@ -40,7 +42,6 @@ const moduleSchema = z.object({
 export type Module = z.infer<typeof moduleSchema>;
 export type ModuleInput = {
   number: number;
-  location: string | null;
   warehouse: Destination;
   containers: { number: number; container_id: string }[];
 };
@@ -49,8 +50,8 @@ export type ModuleInput = {
 const mapInstanceSchema = z.object({
   module_id: z.string(),
   module_number: z.number().int(),
-  location: z.string().nullable(),
   warehouse: destinationSchema,
+  warehouse_name: z.string(),
   id: z.string(),
   number: z.number().int(),
   name: z.string(),
@@ -103,9 +104,14 @@ const placeResultSchema = z.object({
 });
 export type PlaceResult = z.infer<typeof placeResultSchema>;
 
-/** F-06: сводка по складу. */
+/** F-06: склад из справочника — имя, маска INDEX и сводка размещения. */
 const warehouseSchema = z.object({
-  warehouse: destinationSchema,
+  code: destinationSchema,
+  name: z.string(),
+  index_mask: z.string(),
+  first_value: z.number().int(),
+  next_value: z.number().int(),
+  max_value: z.number().int(),
   modules: z.number().int(),
   containers: z.number().int(),
   capacity: z.number().int(),
@@ -124,7 +130,6 @@ export const updateContainer = ({ id, input }: { id: string; input: ContainerInp
 export type ModuleListParams = { q: string; warehouse: string };
 export const listModules = (params: ModuleListParams) =>
   apiGet(withQuery('/modules', params), z.array(moduleSchema));
-export const listModuleLocations = () => apiGet('/modules/locations', z.array(z.string()));
 export const createModule = (input: ModuleInput) => apiPost('/modules', input, moduleSchema);
 export const updateModule = ({ id, input }: { id: string; input: ModuleInput }) =>
   apiPut(`/modules/${id}`, input, moduleSchema);
@@ -133,4 +138,26 @@ export const getMap = (warehouse: string) => apiGet(withQuery('/map', { warehous
 export const getShelf = (code: string) => apiGet(withQuery('/map/shelf', { code }), shelfSchema);
 export const placeDevice = (input: { shelf: string; index: string }) =>
   apiPost('/placements', { shelf_code: input.shelf, device_index: input.index }, placeResultSchema);
+export type Warehouse = z.infer<typeof warehouseSchema>;
 export const listWarehouses = () => apiGet('/warehouses', z.array(warehouseSchema));
+export const createWarehouse = (input: { name: string; index_mask: string }) =>
+  apiPost('/warehouses', input, warehouseSchema);
+export const renameWarehouse = ({ code, name }: { code: string; name: string }) =>
+  apiPut(`/warehouses/${code}`, { name }, warehouseSchema);
+
+const INDEX_DIGITS = 7;
+
+/**
+ * Диапазон INDEX по маске склада (как на сервере): 7 знаков, цифры склада и X на месте номера.
+ * Кириллическая «Х» и строчные буквы допускаются. null — маска неверна.
+ */
+export function maskRange(raw: string): { mask: string; first: string; last: string; count: number } | null {
+  const mask = raw.trim().toUpperCase().replaceAll('Х', 'X');
+  const match = /^([0-9]+)(X+)$/.exec(mask);
+  if (!match || mask.length !== INDEX_DIGITS) return null;
+  const span = 10 ** match[2].length;
+  const start = Number(match[1]) * span;
+  const first = Math.max(start, 1);
+  const last = start + span - 1;
+  return { mask, first: formatIndex(first), last: formatIndex(last), count: last - first + 1 };
+}

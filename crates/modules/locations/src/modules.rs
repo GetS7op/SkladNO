@@ -1,4 +1,4 @@
-//! F-08. Модули: номер, расположение, склад и набор экземпляров контейнеров.
+//! F-08. Модули: номер, расположение (склад из справочника складов) и набор экземпляров контейнеров.
 //! Занятые экземпляры нельзя убрать или сменить им тип; номер и склад занятого модуля не меняются,
 //! иначе адреса на уже наклеенных штрихкодах полок станут неверными.
 
@@ -15,14 +15,13 @@ use serde_json::json;
 use skladno_core::{AppError, AppResult, Db, audit, text};
 use uuid::Uuid;
 
-use crate::warehouse_label;
-
 #[derive(Debug, Serialize, sqlx::FromRow)]
 struct ModuleRow {
     id: Uuid,
     number: i32,
-    location: Option<String>,
+    /// Расположение модуля — код склада; имя склада — для показа.
     warehouse: String,
+    warehouse_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, sqlx::FromRow)]
@@ -55,7 +54,6 @@ pub struct InstanceInput {
 #[derive(Debug, Deserialize)]
 pub struct ModuleInput {
     number: i32,
-    location: Option<String>,
     warehouse: String,
     containers: Vec<InstanceInput>,
 }
@@ -69,7 +67,6 @@ pub struct ListQuery {
 pub fn router() -> Router<Db> {
     Router::new()
         .route("/modules", get(list).post(create))
-        .route("/modules/locations", get(locations))
         .route("/modules/{id}", put(update))
 }
 
@@ -84,9 +81,9 @@ fn validate(input: &ModuleInput) -> AppResult<()> {
             "Порядковый номер модуля — целое число больше нуля".into(),
         ));
     }
-    if !matches!(input.warehouse.as_str(), "park" | "workshop") {
+    if input.warehouse.trim().is_empty() {
         return Err(AppError::Validation(
-            "Выберите склад: Парк или Мастерская".into(),
+            "Выберите расположение — склад модуля".into(),
         ));
     }
     if input.containers.is_empty() {
@@ -142,9 +139,10 @@ async fn list(
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<Vec<Module>>> {
     let modules = sqlx::query_as::<_, ModuleRow>(
-        "SELECT id, number, location, warehouse FROM modules \
-         WHERE ($1::text IS NULL OR location ILIKE $1 OR number::text = $2) \
-         AND ($3::text IS NULL OR warehouse = $3) ORDER BY number",
+        "SELECT m.id, m.number, m.warehouse, w.name AS warehouse_name FROM modules m \
+         JOIN warehouses w ON w.code = m.warehouse \
+         WHERE ($1::text IS NULL OR w.name ILIKE $1 OR m.number::text = $2) \
+         AND ($3::text IS NULL OR m.warehouse = $3) ORDER BY m.number",
     )
     .bind(text::like_pattern(query.q.as_deref()))
     .bind(query.q.as_deref().map(str::trim).unwrap_or_default())
@@ -154,18 +152,10 @@ async fn list(
     Ok(Json(assemble(&db, modules).await?))
 }
 
-async fn locations(State(db): State<Db>) -> AppResult<Json<Vec<String>>> {
-    let rows = sqlx::query_scalar::<_, String>(
-        "SELECT DISTINCT location FROM modules WHERE location IS NOT NULL ORDER BY location",
-    )
-    .fetch_all(&db)
-    .await?;
-    Ok(Json(rows))
-}
-
 async fn fetch(db: &Db, id: Uuid) -> AppResult<Module> {
     let module = sqlx::query_as::<_, ModuleRow>(
-        "SELECT id, number, location, warehouse FROM modules WHERE id = $1",
+        "SELECT m.id, m.number, m.warehouse, w.name AS warehouse_name FROM modules m \
+         JOIN warehouses w ON w.code = m.warehouse WHERE m.id = $1",
     )
     .bind(id)
     .fetch_optional(db)
@@ -197,6 +187,24 @@ async fn ensure_containers(
     Ok(())
 }
 
+/// Расположение модуля должно быть складом из справочника.
+async fn ensure_warehouse(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    code: &str,
+) -> AppResult<()> {
+    let exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM warehouses WHERE code = $1)")
+            .bind(code)
+            .fetch_one(&mut **tx)
+            .await?;
+    if !exists {
+        return Err(AppError::Validation(
+            "Выберите расположение — склад из справочника складов".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn duplicate(number: i32) -> String {
     format!("Модуль №{number} уже есть")
 }
@@ -206,14 +214,13 @@ async fn create(
     Json(input): Json<ModuleInput>,
 ) -> AppResult<(StatusCode, Json<Module>)> {
     validate(&input)?;
-    let location = text::clean(input.location.clone());
     let mut tx = db.begin().await?;
+    ensure_warehouse(&mut tx, &input.warehouse).await?;
     ensure_containers(&mut tx, &input).await?;
     let id = sqlx::query_scalar::<_, Uuid>(
-        "INSERT INTO modules (number, location, warehouse) VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO modules (number, warehouse) VALUES ($1, $2) RETURNING id",
     )
     .bind(input.number)
-    .bind(&location)
     .bind(&input.warehouse)
     .fetch_one(&mut *tx)
     .await
@@ -227,7 +234,6 @@ async fn create(
         "create",
         json!({
             "number": input.number,
-            "location": location,
             "warehouse": input.warehouse,
             "containers": input.containers.len(),
         }),
@@ -265,15 +271,16 @@ async fn update(
     Json(input): Json<ModuleInput>,
 ) -> AppResult<Json<Module>> {
     validate(&input)?;
-    let location = text::clean(input.location.clone());
     let mut tx = db.begin().await?;
     let before = sqlx::query_as::<_, ModuleRow>(
-        "SELECT id, number, location, warehouse FROM modules WHERE id = $1 FOR UPDATE",
+        "SELECT m.id, m.number, m.warehouse, w.name AS warehouse_name FROM modules m \
+         JOIN warehouses w ON w.code = m.warehouse WHERE m.id = $1 FOR UPDATE OF m",
     )
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| AppError::NotFound("Модуль не найден".into()))?;
+    ensure_warehouse(&mut tx, &input.warehouse).await?;
     ensure_containers(&mut tx, &input).await?;
 
     // Блокируем экземпляры, чтобы во время правки в них ничего не разместили.
@@ -293,7 +300,7 @@ async fn update(
     if placed_total > 0 && before.warehouse != input.warehouse {
         return Err(AppError::Conflict(format!(
             "В модуле размещено устройств: {placed_total}. Склад «{}» нельзя сменить, пока они не перемещены.",
-            warehouse_label(&before.warehouse)
+            before.warehouse_name
         )));
     }
 
@@ -344,18 +351,17 @@ async fn update(
             .await?;
     }
     insert_instances(&mut tx, id, &added).await?;
-    sqlx::query("UPDATE modules SET number = $2, location = $3, warehouse = $4, updated_at = now() WHERE id = $1")
+    sqlx::query("UPDATE modules SET number = $2, warehouse = $3, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(input.number)
-        .bind(&location)
         .bind(&input.warehouse)
         .execute(&mut *tx)
         .await
         .map_err(AppError::unique_as(duplicate(input.number)))?;
 
     let mut changes = audit::diff(
-        &json!({ "number": before.number, "location": before.location, "warehouse": before.warehouse }),
-        &json!({ "number": input.number, "location": location, "warehouse": input.warehouse }),
+        &json!({ "number": before.number, "warehouse": before.warehouse }),
+        &json!({ "number": input.number, "warehouse": input.warehouse }),
     );
     if let Some(map) = changes.as_object_mut() {
         if !added.is_empty() {

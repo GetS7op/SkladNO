@@ -12,14 +12,13 @@ use uuid::Uuid;
 
 use skladno_core::settings::address_separator;
 
-use crate::{address::Address, warehouse_label};
+use crate::{address::Address, warehouses::warehouse_name};
 
 pub fn router() -> Router<Db> {
     Router::new()
         .route("/map", get(map))
         .route("/map/shelf", get(shelf))
         .route("/placements", post(place))
-        .route("/warehouses", get(warehouses))
 }
 
 // ---------- Карта ----------
@@ -28,8 +27,8 @@ pub fn router() -> Router<Db> {
 struct MapInstance {
     module_id: Uuid,
     module_number: i32,
-    location: Option<String>,
     warehouse: String,
+    warehouse_name: String,
     id: Uuid,
     number: i32,
     name: String,
@@ -63,11 +62,12 @@ struct MapQuery {
 async fn map(State(db): State<Db>, Query(query): Query<MapQuery>) -> AppResult<Json<MapResponse>> {
     let warehouse = text::clean(query.warehouse);
     let instances = sqlx::query_as::<_, MapInstance>(
-        "SELECT m.id AS module_id, m.number AS module_number, m.location, m.warehouse, mc.id, mc.number, \
+        "SELECT m.id AS module_id, m.number AS module_number, m.warehouse, w.name AS warehouse_name, mc.id, mc.number, \
          c.name, c.short_name, c.racks, c.shelves_per_rack, c.devices_per_shelf, c.power_kw, \
          COALESCE((SELECT sum(mo.power_w) FROM device_placements p JOIN devices d ON d.id = p.device_id \
                    JOIN device_models mo ON mo.id = d.model_id WHERE p.module_container_id = mc.id), 0)::bigint AS load_w \
-         FROM modules m JOIN module_containers mc ON mc.module_id = m.id JOIN containers c ON c.id = mc.container_id \
+         FROM modules m JOIN warehouses w ON w.code = m.warehouse \
+         JOIN module_containers mc ON mc.module_id = m.id JOIN containers c ON c.id = mc.container_id \
          WHERE ($1::text IS NULL OR m.warehouse = $1) ORDER BY m.number, mc.number",
     )
     .bind(&warehouse)
@@ -266,8 +266,8 @@ async fn place(
         return Err(AppError::Conflict(format!(
             "Устройство {} предназначено для склада «{}», а полка {address} — в складе «{}»",
             device.device_index,
-            warehouse_label(&device.destination),
-            warehouse_label(&target.warehouse)
+            warehouse_name(&mut *tx, &device.destination).await?,
+            warehouse_name(&mut *tx, &target.warehouse).await?
         )));
     }
 
@@ -369,44 +369,6 @@ async fn place(
         shelf_count,
         shelf_capacity: target.devices_per_shelf,
     }))
-}
-
-// ---------- F-06. Склады ----------
-
-#[derive(Debug, Serialize, sqlx::FromRow)]
-struct WarehouseSummary {
-    warehouse: String,
-    modules: i64,
-    containers: i64,
-    capacity: i64,
-    power_kw: f64,
-    devices: i64,
-    placed: i64,
-    load_w: i64,
-}
-
-async fn warehouses(State(db): State<Db>) -> AppResult<Json<Vec<WarehouseSummary>>> {
-    let rows = sqlx::query_as::<_, WarehouseSummary>(
-        "WITH caps AS ( \
-           SELECT m.warehouse, count(DISTINCT m.id) AS modules, count(mc.id) AS containers, \
-             COALESCE(sum(c.racks * c.shelves_per_rack * c.devices_per_shelf), 0)::bigint AS capacity, \
-             COALESCE(sum(c.power_kw), 0)::float8 AS power_kw \
-           FROM modules m LEFT JOIN module_containers mc ON mc.module_id = m.id \
-           LEFT JOIN containers c ON c.id = mc.container_id GROUP BY m.warehouse), \
-         devs AS ( \
-           SELECT d.destination AS warehouse, count(*) AS devices, count(p.device_id) AS placed, \
-             COALESCE(sum(mo.power_w) FILTER (WHERE p.device_id IS NOT NULL), 0)::bigint AS load_w \
-           FROM devices d JOIN device_models mo ON mo.id = d.model_id \
-           LEFT JOIN device_placements p ON p.device_id = d.id GROUP BY d.destination) \
-         SELECT w.warehouse, COALESCE(caps.modules, 0) AS modules, COALESCE(caps.containers, 0) AS containers, \
-           COALESCE(caps.capacity, 0) AS capacity, COALESCE(caps.power_kw, 0) AS power_kw, \
-           COALESCE(devs.devices, 0) AS devices, COALESCE(devs.placed, 0) AS placed, COALESCE(devs.load_w, 0) AS load_w \
-         FROM (VALUES ('park'), ('workshop')) AS w(warehouse) \
-         LEFT JOIN caps USING (warehouse) LEFT JOIN devs USING (warehouse)",
-    )
-    .fetch_all(&db)
-    .await?;
-    Ok(Json(rows))
 }
 
 #[cfg(test)]

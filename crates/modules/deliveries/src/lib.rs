@@ -31,17 +31,11 @@ const MAX_DEVICES_PER_DELIVERY: i32 = 10_000;
 const CREATE_LOCK: i64 = 7301;
 
 const SUMMARY: &str = "SELECT d.id, d.number, d.client_id, c.name AS client_name, d.device_group, \
-    d.delivery_date, d.basis_doc, d.basis_date, d.destination, d.stage, d.condition, \
+    d.delivery_date, d.basis_doc, d.basis_date, d.destination, \
+    (SELECT w.name FROM warehouses w WHERE w.code = d.destination) AS destination_name, d.stage, d.condition, \
     (d.condition IS NOT DISTINCT FROM 'factory_new') AS customs, d.created_at, \
     (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices \
     FROM deliveries d JOIN clients c ON c.id = d.client_id";
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum Destination {
-    Park,
-    Workshop,
-}
 
 /// D-05: «Состояние» поставки. Таможенные — только «Прямо с завода»,
 /// остальные три зависят от внешнего состояния устройств.
@@ -65,15 +59,6 @@ impl Condition {
     }
 }
 
-impl Destination {
-    fn as_str(self) -> &'static str {
-        match self {
-            Destination::Park => "park",
-            Destination::Workshop => "workshop",
-        }
-    }
-}
-
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct DeliverySummary {
     id: Uuid,
@@ -85,6 +70,7 @@ pub struct DeliverySummary {
     basis_doc: Option<String>,
     basis_date: Option<NaiveDate>,
     destination: String,
+    destination_name: String,
     stage: String,
     /// None — поставка перенесена из старой базы без этих данных.
     condition: Option<String>,
@@ -138,7 +124,8 @@ pub struct CreateDelivery {
     delivery_date: NaiveDate,
     basis_doc: Option<String>,
     basis_date: Option<NaiveDate>,
-    destination: Destination,
+    /// Код склада из справочника складов.
+    destination: String,
     condition: Condition,
     lines: Vec<LineInput>,
 }
@@ -158,7 +145,6 @@ pub fn router() -> Router<Db> {
     Router::new()
         .route("/deliveries", get(list).post(create))
         .route("/deliveries/groups", get(groups))
-        .route("/deliveries/index-ranges", get(index_ranges))
         .route("/deliveries/{id}", get(detail))
         .route("/deliveries/{id}/advance", post(advance))
         .route("/deliveries/{id}/warnings", get(warnings))
@@ -186,22 +172,6 @@ async fn list(
 async fn groups(State(db): State<Db>) -> AppResult<Json<Vec<String>>> {
     let rows = sqlx::query_scalar::<_, String>(
         "SELECT DISTINCT device_group FROM deliveries WHERE device_group IS NOT NULL ORDER BY device_group",
-    )
-    .fetch_all(&db)
-    .await?;
-    Ok(Json(rows))
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-struct IndexRange {
-    destination: String,
-    next_value: i32,
-    max_value: i32,
-}
-
-async fn index_ranges(State(db): State<Db>) -> AppResult<Json<Vec<IndexRange>>> {
-    let rows = sqlx::query_as::<_, IndexRange>(
-        "SELECT destination, next_value, max_value FROM index_ranges ORDER BY next_value",
     )
     .fetch_all(&db)
     .await?;
@@ -283,7 +253,7 @@ async fn create(
     let total = validate_lines(&input.lines)?;
     let device_group = text::clean(input.device_group);
     let basis_doc = text::clean(input.basis_doc);
-    let destination = input.destination.as_str();
+    let destination = input.destination.trim();
 
     let mut tx = db.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock($1)")
@@ -324,15 +294,17 @@ async fn create(
         ));
     }
 
-    let (next_value, max_value) = sqlx::query_as::<_, (i32, i32)>(
-        "SELECT next_value, max_value FROM index_ranges WHERE destination = $1 FOR UPDATE",
+    // Диапазон INDEX задаётся маской склада; блокировка строки не даёт выдать один INDEX дважды.
+    let (warehouse_name, next_value, max_value) = sqlx::query_as::<_, (String, i32, i32)>(
+        "SELECT name, next_value, max_value FROM warehouses WHERE code = $1 FOR UPDATE",
     )
     .bind(destination)
-    .fetch_one(&mut *tx)
-    .await?;
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::Validation("Выберите склад из справочника складов".into()))?;
     let indexes = index::allocate(next_value, max_value, total).ok_or_else(|| {
         AppError::Conflict(format!(
-            "Диапазон Index для этого назначения исчерпан (свободно {}), обратитесь к администратору",
+            "Диапазон INDEX склада «{warehouse_name}» исчерпан (свободно {}), обратитесь к администратору",
             (max_value - next_value + 1).max(0)
         ))
     })?;
@@ -396,7 +368,7 @@ async fn create(
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query("UPDATE index_ranges SET next_value = $2 WHERE destination = $1")
+    sqlx::query("UPDATE warehouses SET next_value = $2 WHERE code = $1")
         .bind(destination)
         .bind(next_value + total)
         .execute(&mut *tx)

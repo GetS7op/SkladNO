@@ -76,6 +76,17 @@ CT=$(body .id)
 check "модуль Парка" 201 "$(call "$JAR" POST /modules "{\"number\":1,\"warehouse\":\"park\",\"containers\":[{\"number\":1,\"container_id\":\"$CT\"}]}")"
 check "модуль Мастерской" 201 "$(call "$JAR" POST /modules "{\"number\":2,\"warehouse\":\"workshop\",\"containers\":[{\"number\":1,\"container_id\":\"$CT\"}]}")"
 
+echo "== F-06. Склады: справочник и маски INDEX"
+check "СА не создаёт склад — 403" 403 "$(call "$OP_JAR" POST /warehouses '{"name":"Север","index_mask":"1XXXXXX"}')"
+check "маска пересекается с Парком — 409" 409 "$(call "$JAR" POST /warehouses '{"name":"Север","index_mask":"0XXXXXX"}')"
+check "неверная маска — 422" 422 "$(call "$JAR" POST /warehouses '{"name":"Север","index_mask":"1XX"}')"
+check "склад «Север» с маской 1XXXXXX" 201 "$(call "$JAR" POST /warehouses '{"name":"Север","index_mask":"1xxxxxx"}')"
+check "диапазон по маске" "1000000-1999999" "$(body '"\(.first_value)-\(.max_value)"')"
+WH=$(body .code)
+check "вложенная маска 12XXXXX — 409" 409 "$(call "$JAR" POST /warehouses '{"name":"Юг","index_mask":"12XXXXX"}')"
+check "модуль на новом складе" 201 "$(call "$JAR" POST /modules "{\"number\":3,\"warehouse\":\"$WH\",\"containers\":[{\"number\":1,\"container_id\":\"$CT\"}]}")"
+check "расположение модуля — имя склада" "Север" "$(body .warehouse_name)"
+
 echo "== F-03. Поставки"
 delivery() { # назначение, количество, request_id
   printf '{"request_id":"%s","client_id":"%s","delivery_date":"2026-10-27","destination":"%s","condition":"factory_new","lines":[{"model_id":"%s","quantity":%s}]}' "$3" "$C1" "$1" "$M1" "$2"
@@ -89,6 +100,9 @@ call "$JAR" POST /deliveries "$(delivery park 3 "$RID")" >/dev/null
 check "повтор запроса не создаёт вторую поставку" "$D1" "$(body .id)"
 check "поставка в Мастерскую" 201 "$(call "$JAR" POST /deliveries "$(delivery workshop 1 "$(uuid)")")"
 check "Index Мастерской с 9000000" "9000000" "$(body '.devices[0].device_index')"
+check "поставка на новый склад" 201 "$(call "$JAR" POST /deliveries "$(delivery "$WH" 2 "$(uuid)")")"
+check "INDEX по маске склада" "1000000 1000001" "$(body '[.devices[].device_index] | join(" ")')"
+check "имя склада в поставке" "Север" "$(body .destination_name)"
 
 echo "== F-09. Размещение сканированием"
 place() { call "$1" POST /placements "{\"shelf_code\":\"$2\",\"device_index\":\"$3\"}"; }

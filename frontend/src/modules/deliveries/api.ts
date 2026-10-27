@@ -20,6 +20,7 @@ const summaryFields = {
   basis_doc: z.string().nullable(),
   basis_date: z.string().nullable(),
   destination: destinationSchema,
+  destination_name: z.string(),
   stage: stageSchema,
   /** null — у поставок, созданных до появления поля. */
   condition: conditionSchema.nullable(),
@@ -58,12 +59,6 @@ const deliveryDetailSchema = z.object({
   devices: z.array(deliveryDeviceSchema),
 });
 export type DeliveryDetail = z.infer<typeof deliveryDetailSchema>;
-
-const indexRangeSchema = z.object({
-  destination: destinationSchema,
-  next_value: z.number().int(),
-  max_value: z.number().int(),
-});
 
 const deliveryFileSchema = z.object({
   id: z.string(),
@@ -106,8 +101,6 @@ export const getDeliveryWarnings = (id: string) =>
 
 export const listDeliveryGroups = () => apiGet('/deliveries/groups', z.array(z.string()));
 
-export const listIndexRanges = () => apiGet('/deliveries/index-ranges', z.array(indexRangeSchema));
-
 export const listDeliveryFiles = (id: string) =>
   apiGet(`/deliveries/${id}/files`, z.array(deliveryFileSchema));
 
@@ -131,6 +124,7 @@ const inventoryItemSchema = z.object({
   mac_address: z.string().nullable(),
   serial_no: z.string().nullable(),
   destination: destinationSchema,
+  destination_name: z.string(),
   manufacturer: z.string(),
   model: z.string(),
   hashrate_ths: z.number().nullable(),

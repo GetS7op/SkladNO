@@ -2,11 +2,10 @@ import './styles.css';
 import { Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DESTINATIONS, destinationLabel } from '../../core/domain';
 import { formatNumber } from '../../core/ui/format';
 import { Segmented } from '../../core/ui/ui';
 import type { MapData, MapInstance } from './api';
-import { useMap, useShelf } from './hooks';
+import { useMap, useShelf, useWarehouseOptions } from './hooks';
 import { formatAddress } from '../settings/api';
 import { useAddressSeparator } from '../settings/hooks';
 import { ScanPanel } from './ScanPanel';
@@ -16,6 +15,7 @@ export function MapPage() {
   const [warehouse, setWarehouse] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const map = useMap(warehouse);
+  const warehouses = useWarehouseOptions();
   const separator = useAddressSeparator();
 
   const modules = groupByModule(map.data);
@@ -36,7 +36,7 @@ export function MapPage() {
         <Segmented
           value={warehouse}
           onChange={setWarehouse}
-          options={[{ value: '', label: 'Все склады' }, ...DESTINATIONS]}
+          options={[{ value: '', label: 'Все склады' }, ...warehouses]}
         />
         <span className="legend">
           <i className="cell" /> свободно <i className="cell partial" /> частично <i className="cell full" />{' '}
@@ -51,13 +51,11 @@ export function MapPage() {
           <Link to="/modules">модули</Link>.
         </p>
       )}
-      {modules.map(({ number, location, warehouse: wh, instances }) => (
+      {modules.map(({ number, warehouseName, instances }) => (
         <section key={number} className="card">
           <div className="card-head">
             <h2>Модуль №{number}</h2>
-            <span className="muted">
-              {location ?? 'расположение не указано'} · {destinationLabel(wh)}
-            </span>
+            <span className="muted">{warehouseName}</span>
             <Link to={`/labels/shelves?module=${number}`} className="btn ghost">
               <Printer size={16} /> Наклейки полок
             </Link>
@@ -83,14 +81,13 @@ export function MapPage() {
 function groupByModule(data?: MapData) {
   const modules: {
     number: number;
-    location: string | null;
-    warehouse: MapInstance['warehouse'];
+    warehouseName: string;
     instances: MapInstance[];
   }[] = [];
   for (const inst of data?.instances ?? []) {
     let m = modules.find((x) => x.number === inst.module_number);
     if (!m) {
-      m = { number: inst.module_number, location: inst.location, warehouse: inst.warehouse, instances: [] };
+      m = { number: inst.module_number, warehouseName: inst.warehouse_name, instances: [] };
       modules.push(m);
     }
     m.instances.push(inst);

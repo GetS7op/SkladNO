@@ -3,18 +3,17 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCan } from '../../core/auth/context';
-import { DESTINATIONS, type Destination, destinationLabel } from '../../core/domain';
+import type { Destination } from '../../core/domain';
 import { type Column, Registry } from '../../core/ui/Registry';
 import { ErrorBanner, Field, Modal, Segmented } from '../../core/ui/ui';
 import { useDebounced } from '../../core/ui/useDebounced';
 import { exportOptions } from '../reports/exportOptions';
 import type { Module, ModuleInput } from './api';
-import { useContainers, useCreateModule, useModuleLocations, useModules, useUpdateModule } from './hooks';
+import { useContainers, useCreateModule, useModules, useUpdateModule, useWarehouseOptions } from './hooks';
 
 const COLUMNS: Column<Module>[] = [
   { key: 'number', title: '№ модуля', render: (r) => <b className="mono">{r.number}</b> },
-  { key: 'location', title: 'Расположение', render: (r) => r.location ?? '—' },
-  { key: 'warehouse', title: 'Склад', render: (r) => destinationLabel(r.warehouse) },
+  { key: 'warehouse', title: 'Расположение', render: (r) => r.warehouse_name },
   {
     key: 'containers',
     title: 'Контейнеры',
@@ -41,6 +40,7 @@ export function ModulesPage() {
   const [editing, setEditing] = useState<Module | 'new' | null>(null);
   const q = useDebounced(search);
   const list = useModules({ q, warehouse });
+  const warehouses = useWarehouseOptions();
 
   return (
     <>
@@ -62,7 +62,7 @@ export function ModulesPage() {
           <Segmented
             value={warehouse}
             onChange={setWarehouse}
-            options={[{ value: '', label: 'Все склады' }, ...DESTINATIONS]}
+            options={[{ value: '', label: 'Все склады' }, ...warehouses]}
           />
         }
         columns={COLUMNS}
@@ -87,8 +87,7 @@ interface InstanceDraft {
 
 function ModuleForm({ module, onClose }: { module: Module | null; onClose: () => void }) {
   const [number, setNumber] = useState(module?.number.toString() ?? '');
-  const [location, setLocation] = useState(module?.location ?? '');
-  const [warehouse, setWarehouse] = useState<Destination>(module?.warehouse ?? 'park');
+  const [warehouse, setWarehouse] = useState<Destination>(module?.warehouse ?? '');
   const [instances, setInstances] = useState<InstanceDraft[]>(
     () =>
       module?.containers.map((c, i) => ({
@@ -99,7 +98,7 @@ function ModuleForm({ module, onClose }: { module: Module | null; onClose: () =>
       })) ?? [{ key: 1, number: '1', container_id: '', placed: 0 }],
   );
   const containers = useContainers();
-  const locations = useModuleLocations();
+  const warehouses = useWarehouseOptions();
   const occupied = (module?.placed ?? 0) > 0;
 
   const createModule = useCreateModule();
@@ -120,7 +119,6 @@ function ModuleForm({ module, onClose }: { module: Module | null; onClose: () =>
       onSubmit={() =>
         submit({
           number: Number(number),
-          location: location || null,
           warehouse,
           containers: instances.map((i) => ({ number: Number(i.number), container_id: i.container_id })),
         })
@@ -154,22 +152,30 @@ function ModuleForm({ module, onClose }: { module: Module | null; onClose: () =>
             disabled={occupied}
           />
         </Field>
-        <Field label="Расположение модуля" hint="Выберите или введите новое">
-          <input value={location} onChange={(e) => setLocation(e.target.value)} list="module-locations" />
-          <datalist id="module-locations">
-            {locations.data?.map((l) => (
-              <option key={l} value={l} />
+        <Field
+          label="Расположение модуля"
+          required
+          hint={
+            occupied
+              ? 'В модуле есть устройства — склад не меняется, пока они не перемещены'
+              : 'Склад из справочника складов; новый склад добавляет администратор в разделе «Склады»'
+          }
+        >
+          <select
+            value={warehouse}
+            onChange={(e) => setWarehouse(e.target.value)}
+            required
+            disabled={occupied}
+          >
+            <option value="">— выберите склад —</option>
+            {warehouses.map((w) => (
+              <option key={w.value} value={w.value}>
+                {w.label}
+              </option>
             ))}
-          </datalist>
+          </select>
         </Field>
       </div>
-      <Field label="Склад" required>
-        <Segmented
-          value={warehouse}
-          onChange={setWarehouse}
-          options={occupied ? DESTINATIONS.filter((d) => d.value === warehouse) : DESTINATIONS}
-        />
-      </Field>
       <div className="field">
         <span className="field-label">Контейнеры модуля</span>
         <div className="lines-scroll">

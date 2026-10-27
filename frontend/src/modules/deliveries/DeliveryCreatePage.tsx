@@ -2,12 +2,13 @@ import './styles.css';
 import { ArrowLeft, Plus, Trash2, TriangleAlert } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CONDITIONS, type Condition, DESTINATIONS, type Destination } from '../../core/domain';
-import { newRequestId, today } from '../../core/ui/format';
+import { CONDITIONS, type Condition, type Destination } from '../../core/domain';
+import { formatIndex, newRequestId, today } from '../../core/ui/format';
 import { ErrorBanner, Field, Segmented } from '../../core/ui/ui';
 import { useDeviceModels } from '../catalog/hooks';
 import { useClients } from '../clients/hooks';
-import { useCreateDelivery, useDeliveryGroups, useIndexRanges } from './hooks';
+import { useWarehouses } from '../locations/hooks';
+import { useCreateDelivery, useDeliveryGroups } from './hooks';
 
 interface LineDraft {
   key: number;
@@ -26,7 +27,7 @@ export function DeliveryCreatePage() {
     delivery_date: today(),
     basis_doc: '',
     basis_date: '',
-    destination: 'park' as Destination,
+    destination: '' as Destination,
     condition: '' as Condition | '',
   });
   const [lines, setLines] = useState<LineDraft[]>([{ key: 1, model_id: '', quantity: '1' }]);
@@ -34,15 +35,21 @@ export function DeliveryCreatePage() {
   const clients = useClients();
   const models = useDeviceModels({ q: '', archived: false });
   const groups = useDeliveryGroups();
-  const ranges = useIndexRanges();
+  const warehouses = useWarehouses();
 
   const total = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
-  const range = ranges.data?.find((r) => r.destination === header.destination);
+  const range = warehouses.data?.find((w) => w.code === header.destination);
   const usedModels = new Set(lines.map((l) => l.model_id));
   const linesValid = lines.every(
     (l) => l.model_id && Number.isInteger(Number(l.quantity)) && Number(l.quantity) > 0,
   );
-  const canSubmit = header.client_id && header.delivery_date && header.condition && linesValid && total > 0;
+  const canSubmit =
+    header.client_id &&
+    header.delivery_date &&
+    header.destination &&
+    header.condition &&
+    linesValid &&
+    total > 0;
 
   const create = useCreateDelivery();
   const submit = () =>
@@ -117,15 +124,26 @@ export function DeliveryCreatePage() {
             <input type="date" value={header.basis_date} onChange={setField('basis_date')} />
           </Field>
           <Field
-            label="Назначение"
+            label="Назначение (склад)"
             required
-            hint={range && `Следующий Index: ${String(range.next_value).padStart(7, '0')}`}
+            hint={
+              range
+                ? `Маска INDEX ${range.index_mask}, следующий INDEX ${formatIndex(range.next_value)}, свободно ${(range.max_value - range.next_value + 1).toLocaleString('ru-RU')}`
+                : 'Склад определяет диапазон INDEX устройств поставки'
+            }
           >
-            <Segmented
+            <select
               value={header.destination}
-              onChange={(destination) => setHeader((h) => ({ ...h, destination }))}
-              options={DESTINATIONS}
-            />
+              onChange={(e) => setHeader((h) => ({ ...h, destination: e.target.value }))}
+              required
+            >
+              <option value="">— выберите склад —</option>
+              {warehouses.data?.map((w) => (
+                <option key={w.code} value={w.code}>
+                  {w.name} · {w.index_mask}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <Field

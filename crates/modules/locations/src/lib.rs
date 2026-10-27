@@ -6,6 +6,7 @@ mod containers;
 mod map;
 mod modules;
 mod settings;
+mod warehouses;
 
 use axum::Router;
 use skladno_core::Db;
@@ -18,12 +19,5 @@ pub fn router() -> Router<Db> {
         .merge(modules::router())
         .merge(map::router())
         .merge(settings::router())
-}
-
-pub(crate) fn warehouse_label(value: &str) -> &'static str {
-    match value {
-        "park" => "Парк",
-        "workshop" => "Мастерская",
-        _ => "?",
-    }
+        .merge(warehouses::router())
 }

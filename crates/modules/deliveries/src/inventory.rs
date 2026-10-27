@@ -26,6 +26,7 @@ pub fn router() -> Router<Db> {
 }
 
 const SELECT: &str = "SELECT v.id, v.device_index, v.mac_address, v.serial_no, v.destination, \
+    (SELECT w.name FROM warehouses w WHERE w.code = v.destination) AS destination_name, \
     m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client_name, \
     d.id AS delivery_id, d.number AS delivery_number, d.delivery_date, d.stage, \
     skladno_address(md.number, mc.number, p.rack, p.shelf) AS location \
@@ -46,6 +47,7 @@ pub struct InventoryItem {
     mac_address: Option<String>,
     serial_no: Option<String>,
     destination: String,
+    destination_name: String,
     manufacturer: String,
     model: String,
     hashrate_ths: Option<f64>,

@@ -13,7 +13,6 @@ import {
   listDeliveries,
   listDeliveryFiles,
   listDeliveryGroups,
-  listIndexRanges,
   uploadDeliveryFile,
 } from './api';
 
@@ -23,7 +22,6 @@ export const deliveryKeys = {
   detail: (id: string) => ['deliveries', 'detail', id] as const,
   files: (id: string) => ['deliveries', 'files', id] as const,
   groups: ['deliveries', 'groups'] as const,
-  indexRanges: ['deliveries', 'index-ranges'] as const,
   inventory: (params: InventoryParams) => ['deliveries', 'inventory', params] as const,
   device: (id: string) => ['deliveries', 'device', id] as const,
 };
@@ -45,9 +43,6 @@ export function useDelivery(id: string) {
 
 export const useDeliveryGroups = () =>
   useQuery({ queryKey: deliveryKeys.groups, queryFn: listDeliveryGroups });
-
-export const useIndexRanges = () =>
-  useQuery({ queryKey: deliveryKeys.indexRanges, queryFn: listIndexRanges });
 
 export function useCreateDelivery() {
   const queryClient = useQueryClient();

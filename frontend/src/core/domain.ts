@@ -2,16 +2,9 @@ import { z } from 'zod';
 
 /** Общие перечисления предметной области и их подписи (используются несколькими модулями). */
 
-export const destinationSchema = z.enum(['park', 'workshop']);
+/** Склад (назначение поставки, расположение модуля) — код из справочника складов; имя — через useWarehouseName. */
+export const destinationSchema = z.string();
 export type Destination = z.infer<typeof destinationSchema>;
-
-export const DESTINATIONS: { value: Destination; label: string; hint: string }[] = [
-  { value: 'park', label: 'Парк', hint: 'Index от 0000001' },
-  { value: 'workshop', label: 'Мастерская', hint: 'Index от 9000000' },
-];
-
-export const destinationLabel = (value: Destination) =>
-  DESTINATIONS.find((d) => d.value === value)?.label ?? value;
 
 export const stageSchema = z.enum(['created', 'receiving', 'confirmation', 'closed']);
 export type Stage = z.infer<typeof stageSchema>;

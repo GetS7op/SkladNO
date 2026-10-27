@@ -2,7 +2,7 @@ import './styles.css';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { STAGES, conditionLabel, destinationLabel } from '../../core/domain';
+import { STAGES, conditionLabel } from '../../core/domain';
 import { formatDate } from '../../core/ui/format';
 import { type Column, Registry } from '../../core/ui/Registry';
 import { useDebounced } from '../../core/ui/useDebounced';
@@ -17,7 +17,7 @@ const COLUMNS: Column<DeliverySummary>[] = [
   { key: 'client', title: 'Клиент', render: (r) => r.client_name },
   { key: 'group', title: 'Группа устройств', render: (r) => r.device_group ?? '—' },
   { key: 'basis', title: 'Документ-основание', render: (r) => r.basis_doc ?? '—' },
-  { key: 'dest', title: 'Назначение', render: (r) => destinationLabel(r.destination) },
+  { key: 'dest', title: 'Назначение', render: (r) => r.destination_name },
   { key: 'devices', title: 'Устройств', align: 'right', render: (r) => r.devices },
   {
     key: 'condition',

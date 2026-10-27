@@ -1,8 +1,9 @@
 import './styles.css';
 import { useState } from 'react';
-import { type Destination, type Stage, destinationLabel, stageLabel } from '../../core/domain';
+import { type Stage, stageLabel } from '../../core/domain';
 import { formatDateTime } from '../../core/ui/format';
 import { Segmented } from '../../core/ui/ui';
+import { useWarehouseName } from '../locations/hooks';
 import type { AuditEntry } from './api';
 import { useAudit } from './hooks';
 
@@ -18,6 +19,7 @@ const ENTITY_LABELS: Record<string, string> = {
   user: 'Пользователь',
   invite: 'Приглашение',
   settings: 'Настройки',
+  warehouse: 'Склад',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -44,6 +46,8 @@ const FIELD_LABELS: Record<string, string> = {
   weight_kg: 'Вес',
   archived: 'Архив',
   name: 'Наименование',
+  code: 'Код склада',
+  index_mask: 'Маска INDEX',
   note: 'Заметка',
   stage: 'Этап',
   number: 'Номер',
@@ -108,6 +112,7 @@ export function AuditPage() {
             { value: 'device', label: 'Размещение' },
             { value: 'device_model', label: 'Модели' },
             { value: 'client', label: 'Клиенты' },
+            { value: 'warehouse', label: 'Склады' },
             { value: 'module', label: 'Модули' },
             { value: 'container', label: 'Контейнеры' },
             { value: 'pool', label: 'Пулы' },
@@ -152,13 +157,20 @@ export function AuditList({
 }
 
 function Changes({ entry }: { entry: AuditEntry }) {
+  const warehouseName = useWarehouseName();
   const items = Object.entries(entry.changes ?? {}).filter(([k]) => !HIDDEN.has(k));
   if (items.length === 0) return null;
+  // Склад в журнале хранится кодом — показываем имя из справочника складов.
+  const labels: Record<string, (value: string) => string> = {
+    ...VALUE_LABELS,
+    destination: warehouseName,
+    warehouse: warehouseName,
+  };
   return (
     <span className="changes">
       {items.map(([key, value]) => (
         <span key={key}>
-          {FIELD_LABELS[key] ?? key}: {renderValue(value, VALUE_LABELS[key])}
+          {FIELD_LABELS[key] ?? key}: {renderValue(value, labels[key])}
         </span>
       ))}
     </span>
@@ -167,8 +179,6 @@ function Changes({ entry }: { entry: AuditEntry }) {
 
 const VALUE_LABELS: Record<string, (value: string) => string> = {
   stage: (v) => stageLabel(v as Stage),
-  destination: (v) => destinationLabel(v as Destination),
-  warehouse: (v) => destinationLabel(v as Destination),
 };
 
 function renderValue(value: unknown, label?: (value: string) => string): string {

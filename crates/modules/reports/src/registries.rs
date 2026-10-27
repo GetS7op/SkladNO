@@ -7,14 +7,6 @@ use skladno_core::{AppResult, Db};
 
 use crate::table::{Cell, Table};
 
-fn destination(v: &str) -> &'static str {
-    match v {
-        "park" => "Парк",
-        "workshop" => "Мастерская",
-        _ => "?",
-    }
-}
-
 fn stage(v: &str) -> &'static str {
     match v {
         "created" => "Создание",
@@ -171,7 +163,7 @@ struct InventoryRow {
 async fn inventory(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, InventoryRow>(
         "SELECT v.device_index, v.id, m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client, \
-         d.number, d.delivery_date, v.destination, d.stage, \
+         d.number, d.delivery_date, (SELECT w.name FROM warehouses w WHERE w.code = v.destination) AS destination, d.stage, \
          skladno_address(md.number, mc.number, p.rack, p.shelf) AS location, \
          v.mac_address, v.serial_no \
          FROM devices v JOIN device_models m ON m.id = v.model_id JOIN deliveries d ON d.id = v.delivery_id \
@@ -199,10 +191,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
         ("Суммарный XP, Th/s".to_string(), total_xp.into()),
         ("Суммарное потребление, кВт".to_string(), total_kw.into()),
     ];
-    stats.extend(tally(
-        "Склад",
-        rows.iter().map(|r| destination(&r.destination)),
-    ));
+    stats.extend(tally("Склад", rows.iter().map(|r| r.destination.as_str())));
     stats.extend(tally("Клиент", rows.iter().map(|r| r.client.as_str())));
     stats.extend(tally("Модель", rows.iter().map(|r| r.model.as_str())));
     Ok(Table {
@@ -237,7 +226,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
                     r.client.into(),
                     r.number.into(),
                     date(r.delivery_date),
-                    destination(&r.destination).into(),
+                    r.destination.into(),
                     stage(&r.stage).into(),
                     r.location.into(),
                     r.mac_address.into(),
@@ -311,7 +300,7 @@ struct DeliveryRow {
 
 async fn deliveries(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, DeliveryRow>(
-        "SELECT d.number, d.delivery_date, c.name AS client, d.device_group, d.basis_doc, d.destination, d.stage, d.condition, \
+        "SELECT d.number, d.delivery_date, c.name AS client, d.device_group, d.basis_doc, (SELECT w.name FROM warehouses w WHERE w.code = d.destination) AS destination, d.stage, d.condition, \
          (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices, \
          (SELECT count(*) FROM devices v JOIN device_placements p ON p.device_id = v.id WHERE v.delivery_id = d.id) AS placed \
          FROM deliveries d JOIN clients c ON c.id = d.client_id ORDER BY d.year DESC, d.seq DESC",
@@ -336,7 +325,7 @@ async fn deliveries(db: &Db) -> AppResult<Table> {
     ));
     stats.extend(tally(
         "Назначение",
-        rows.iter().map(|r| destination(&r.destination)),
+        rows.iter().map(|r| r.destination.as_str()),
     ));
     Ok(Table {
         title: "Поставки".into(),
@@ -363,7 +352,7 @@ async fn deliveries(db: &Db) -> AppResult<Table> {
                     r.client.into(),
                     r.device_group.into(),
                     r.basis_doc.into(),
-                    destination(&r.destination).into(),
+                    r.destination.into(),
                     condition(r.condition.as_deref()).into(),
                     yes_no(r.condition.as_deref() == Some("factory_new")),
                     stage(&r.stage).into(),
@@ -561,7 +550,7 @@ async fn containers(db: &Db) -> AppResult<Table> {
 #[derive(sqlx::FromRow)]
 struct ModuleRow {
     number: i32,
-    location: Option<String>,
+    /// Расположение — имя склада.
     warehouse: String,
     containers: String,
     capacity: i64,
@@ -570,12 +559,13 @@ struct ModuleRow {
 
 async fn modules(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, ModuleRow>(
-        "SELECT m.number, m.location, m.warehouse, \
+        "SELECT m.number, w.name AS warehouse, \
          COALESCE(string_agg(mc.number::text || '·' || c.short_name, ', ' ORDER BY mc.number), '') AS containers, \
          COALESCE(sum(c.racks * c.shelves_per_rack * c.devices_per_shelf), 0)::bigint AS capacity, \
          (SELECT count(*) FROM device_placements p JOIN module_containers x ON x.id = p.module_container_id WHERE x.module_id = m.id) AS placed \
-         FROM modules m LEFT JOIN module_containers mc ON mc.module_id = m.id LEFT JOIN containers c ON c.id = mc.container_id \
-         GROUP BY m.id ORDER BY m.number",
+         FROM modules m JOIN warehouses w ON w.code = m.warehouse \
+         LEFT JOIN module_containers mc ON mc.module_id = m.id LEFT JOIN containers c ON c.id = mc.container_id \
+         GROUP BY m.id, w.name ORDER BY m.number",
     )
     .fetch_all(db)
     .await?;
@@ -589,7 +579,7 @@ async fn modules(db: &Db) -> AppResult<Table> {
     ];
     stats.extend(tally(
         "Модулей на складе",
-        rows.iter().map(|r| destination(&r.warehouse)),
+        rows.iter().map(|r| r.warehouse.as_str()),
     ));
     Ok(Table {
         title: "Модули".into(),
@@ -597,7 +587,6 @@ async fn modules(db: &Db) -> AppResult<Table> {
         columns: vec![
             "№ модуля",
             "Расположение",
-            "Склад",
             "Контейнеры",
             "Мест",
             "Занято",
@@ -608,8 +597,7 @@ async fn modules(db: &Db) -> AppResult<Table> {
             .map(|r| {
                 vec![
                     r.number.into(),
-                    r.location.into(),
-                    destination(&r.warehouse).into(),
+                    r.warehouse.into(),
                     r.containers.into(),
                     r.capacity.into(),
                     r.placed.into(),

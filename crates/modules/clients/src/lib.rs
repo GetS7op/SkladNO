@@ -178,7 +178,8 @@ async fn export_devices(
 ) -> AppResult<impl IntoResponse> {
     let client = fetch(&db, id).await?;
     let rows = sqlx::query_as::<_, ExportRow>(
-        "SELECT v.device_index, v.id, m.manufacturer, m.model, d.number, d.delivery_date, d.destination, d.stage \
+        "SELECT v.device_index, v.id, m.manufacturer, m.model, d.number, d.delivery_date, \
+         (SELECT w.name FROM warehouses w WHERE w.code = d.destination) AS destination, d.stage \
          FROM devices v JOIN deliveries d ON d.id = v.delivery_id JOIN device_models m ON m.id = v.model_id \
          WHERE d.client_id = $1 ORDER BY v.device_index",
     )
@@ -197,7 +198,7 @@ async fn export_devices(
             r.model,
             r.number,
             r.delivery_date.format("%d.%m.%Y").to_string(),
-            destination_label(&r.destination).into(),
+            r.destination.clone(),
             stage_label(&r.stage).into(),
         ];
         csv.push_str(&fields.map(|f| csv_field(&f)).join(";"));
@@ -221,14 +222,6 @@ fn csv_field(value: &str) -> String {
         format!("\"{}\"", value.replace('"', "\"\""))
     } else {
         value.to_string()
-    }
-}
-
-fn destination_label(value: &str) -> &'static str {
-    match value {
-        "park" => "Парк",
-        "workshop" => "Мастерская",
-        _ => "?",
     }
 }
 

@@ -59,3 +59,6 @@ export function downloadCsv(filename: string, header: string[], rows: (string | 
   download(url, filename);
   URL.revokeObjectURL(url);
 }
+
+/** INDEX устройства — всегда 7 цифр с ведущими нулями. */
+export const formatIndex = (value: number) => String(value).padStart(7, '0');

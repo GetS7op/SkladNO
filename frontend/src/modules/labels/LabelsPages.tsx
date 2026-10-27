@@ -2,7 +2,6 @@ import './styles.css';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { destinationLabel } from '../../core/domain';
 import { ErrorBanner } from '../../core/ui/ui';
 import { useDelivery } from '../deliveries/hooks';
 import { useMap } from '../locations/hooks';
@@ -40,7 +39,7 @@ export function ShelfLabelsPage() {
         Array.from({ length: i.shelves_per_rack }, (_, s) => ({
           code: formatAddress(separator, i.module_number, i.number, r + 1, s + 1),
           caption: `Модуль ${i.module_number} · ${i.short_name} №${i.number} · стеллаж ${r + 1} · полка ${s + 1}`,
-          warehouse: destinationLabel(i.warehouse),
+          warehouse: i.warehouse_name,
         })),
       ).flat(),
     );

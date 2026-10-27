@@ -1,10 +1,10 @@
 import './styles.css';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DESTINATIONS, destinationLabel } from '../../core/domain';
 import { type Column, Registry } from '../../core/ui/Registry';
 import { Segmented } from '../../core/ui/ui';
 import { useDebounced } from '../../core/ui/useDebounced';
+import { useWarehouseOptions } from '../locations/hooks';
 import { exportOptions } from '../reports/exportOptions';
 import type { InventoryItem } from './api';
 import { useInventory } from './hooks';
@@ -28,7 +28,7 @@ const COLUMNS: Column<InventoryItem>[] = [
   },
   { key: 'client', title: 'Клиент', render: (r) => r.client_name },
   { key: 'delivery', title: 'Поставка', render: (r) => <span className="mono">{r.delivery_number}</span> },
-  { key: 'warehouse', title: 'Склад', render: (r) => destinationLabel(r.destination) },
+  { key: 'warehouse', title: 'Склад', render: (r) => r.destination_name },
   {
     key: 'location',
     title: 'Место',
@@ -44,6 +44,7 @@ export function InventoryPage() {
   const [destination, setDestination] = useState('');
   const [placement, setPlacement] = useState('');
   const q = useDebounced(search);
+  const warehouses = useWarehouseOptions();
   const inventory = useInventory({ q, destination, placement });
   const rows = inventory.data?.pages.flatMap((p) => p.items);
   const total = inventory.data?.pages[0]?.total ?? 0;
@@ -61,7 +62,7 @@ export function InventoryPage() {
             <Segmented
               value={destination}
               onChange={setDestination}
-              options={[{ value: '', label: 'Все склады' }, ...DESTINATIONS]}
+              options={[{ value: '', label: 'Все склады' }, ...warehouses]}
             />
             <Segmented
               value={placement}

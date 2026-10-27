@@ -3,7 +3,7 @@ import { ArrowLeft, Check, Download, FileUp, Printer, Search } from 'lucide-reac
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCan } from '../../core/auth/context';
-import { STAGES, conditionLabel, destinationLabel } from '../../core/domain';
+import { STAGES, conditionLabel } from '../../core/domain';
 import { download, formatDate } from '../../core/ui/format';
 import { ErrorBanner } from '../../core/ui/ui';
 import { AuditList } from '../audit/AuditPage';
@@ -32,7 +32,7 @@ export function DeliveryPage() {
         <div>
           <h1 className="mono">{d.number}</h1>
           <p className="muted">
-            {d.client_name} · {formatDate(d.delivery_date)} · {destinationLabel(d.destination)}
+            {d.client_name} · {formatDate(d.delivery_date)} · {d.destination_name}
           </p>
         </div>
         <StageBadge stage={d.stage} />
@@ -42,7 +42,7 @@ export function DeliveryPage() {
 
       {d.stage === 'receiving' && (
         <ScanPanel
-          hint={`Шаг 3: сканируйте штрихкод полки склада «${destinationLabel(d.destination)}», затем INDEX с наклейки. Размещено ${placedCount(d)} из ${d.devices.length}.`}
+          hint={`Шаг 3: сканируйте штрихкод полки склада «${d.destination_name}», затем INDEX с наклейки. Размещено ${placedCount(d)} из ${d.devices.length}.`}
         />
       )}
 
@@ -60,7 +60,7 @@ export function DeliveryPage() {
             {d.basis_doc ? `${d.basis_doc}${d.basis_date ? ` от ${formatDate(d.basis_date)}` : ''}` : '—'}
           </dd>
           <dt>Назначение</dt>
-          <dd>{destinationLabel(d.destination)}</dd>
+          <dd>{d.destination_name}</dd>
           <dt>Состояние</dt>
           <dd>
             {conditionLabel(d.condition)}
