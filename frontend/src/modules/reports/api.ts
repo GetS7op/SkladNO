@@ -13,7 +13,7 @@ export const exportUrl = (registry: ExportRegistry, format: ExportFormat) =>
 /** Справочники, которые загружаются из CSV / XLSX. */
 export type ImportRegistry = 'devices' | 'clients';
 
-const importReportSchema = z.object({
+export const importReportSchema = z.object({
   dry_run: z.boolean(),
   total: z.number().int(),
   created: z.number().int(),

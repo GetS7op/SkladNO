@@ -450,11 +450,13 @@ textarea:focus {
 }
 .card-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
 }
 .card-head h2 {
   margin-right: auto;
+  white-space: nowrap;
 }
 .grid-2,
 .grid-3 {
@@ -672,6 +674,15 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Подгрузка длинных списков */
+.load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 @media (max-width: 900px) {

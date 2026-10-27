@@ -6,6 +6,8 @@ import { destinationLabel } from '../../core/domain';
 import { ErrorBanner } from '../../core/ui/ui';
 import { useDelivery } from '../deliveries/hooks';
 import { useMap } from '../locations/hooks';
+import { formatAddress } from '../settings/api';
+import { useAddressSeparator } from '../settings/hooks';
 import { Barcode, LabelSheet } from './Labels';
 import type { LabelLayout } from './layouts';
 
@@ -28,6 +30,7 @@ export function ShelfLabelsPage() {
   const [layout, setLayout, params, setParams] = useLayout();
   const module = params.get('module') ?? '';
   const map = useMap('');
+  const separator = useAddressSeparator();
   const modules = [...new Set(map.data?.instances.map((i) => i.module_number))].sort((a, b) => a - b);
 
   const labels = (map.data?.instances ?? [])
@@ -35,7 +38,7 @@ export function ShelfLabelsPage() {
     .flatMap((i) =>
       Array.from({ length: i.racks }, (_, r) =>
         Array.from({ length: i.shelves_per_rack }, (_, s) => ({
-          code: `${i.module_number}X${i.number}X${r + 1}X${s + 1}`,
+          code: formatAddress(separator, i.module_number, i.number, r + 1, s + 1),
           caption: `Модуль ${i.module_number} · ${i.short_name} №${i.number} · стеллаж ${r + 1} · полка ${s + 1}`,
           warehouse: destinationLabel(i.warehouse),
         })),
@@ -45,7 +48,7 @@ export function ShelfLabelsPage() {
   return (
     <LabelSheet
       title="Наклейки полок"
-      subtitle="Адрес полки модуль X контейнер X стеллаж X полка — сканируется ТСД при приёме поставки"
+      subtitle={`Адрес полки ${['модуль', 'контейнер', 'стеллаж', 'полка'].join(` ${separator} `)} — сканируется ТСД при приёме поставки`}
       layout={layout}
       onLayout={setLayout}
       count={labels.length}

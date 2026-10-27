@@ -16,7 +16,7 @@ use skladno_clients::ClientInput;
 use skladno_core::{AppError, AppResult, Db};
 use sqlx::Acquire;
 
-const MAX_ROWS: usize = 10_000;
+pub(crate) const MAX_ROWS: usize = 10_000;
 
 #[derive(Deserialize)]
 pub struct ImportQuery {
@@ -27,8 +27,8 @@ pub struct ImportQuery {
 #[derive(Serialize)]
 pub struct RowError {
     /// Номер строки в файле (шапка — строка 1).
-    row: usize,
-    message: String,
+    pub(crate) row: usize,
+    pub(crate) message: String,
 }
 
 #[derive(Serialize)]
@@ -41,7 +41,7 @@ pub struct ImportReport {
 }
 
 /// Таблица из файла: строки ячеек-строк, первая непустая строка — шапка.
-fn read_rows(bytes: &[u8]) -> AppResult<Vec<Vec<String>>> {
+pub(crate) fn read_rows(bytes: &[u8]) -> AppResult<Vec<Vec<String>>> {
     let rows = if bytes.starts_with(b"PK") {
         read_xlsx(bytes)?
     } else {
@@ -123,7 +123,7 @@ fn read_csv(text: &str) -> Vec<Vec<String>> {
 }
 
 /// Колонки по шапке: «Потребление, Вт» → «потребление». Возвращает индекс колонки по ключу.
-fn header_index(header: &[String], aliases: &[(&'static str, &[&str])]) -> HashMap<&'static str, usize> {
+pub(crate) fn header_index(header: &[String], aliases: &[(&'static str, &[&str])]) -> HashMap<&'static str, usize> {
     let mut found = HashMap::new();
     for (i, title) in header.iter().enumerate() {
         let base = title.split(',').next().unwrap_or("").trim().to_lowercase();

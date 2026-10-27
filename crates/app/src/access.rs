@@ -17,13 +17,21 @@ fn required_role(method: &Method, path: &str) -> Option<Role> {
     if path.starts_with("/users") || path.starts_with("/invites") {
         return Some(Role::Admin);
     }
+    if path == "/settings" && method != Method::GET {
+        return Some(Role::Admin);
+    }
     if method == Method::GET || method == Method::HEAD {
         return Some(Role::Operator);
     }
     let is_delivery_advance = path.starts_with("/deliveries/") && path.ends_with("/advance");
-    let is_delivery_file = path.starts_with("/deliveries/") && path.ends_with("/files");
+    let is_delivery_file = path.starts_with("/deliveries/")
+        && (path.ends_with("/files") || path.ends_with("/devices/import"));
+    // Данные устройства (MAC, серийный) правит СА; закрытую поставку — Старший СА (в обработчике).
+    if method == Method::PUT && path.starts_with("/inventory/") {
+        return Some(Role::Operator);
+    }
     match path {
-        // Работа СА: создание поставки, файлы документа, приём сканированием, смена этапа
+        // Работа СА: создание поставки, файлы документа, данные устройств, приём, смена этапа
         // (дальше этап проверяет обработчик).
         "/deliveries" | "/placements" => Some(Role::Operator),
         _ if is_delivery_advance || is_delivery_file => Some(Role::Operator),
@@ -68,9 +76,13 @@ mod tests {
         assert_eq!(required_role(&post, "/placements"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/deliveries/1/advance"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/deliveries/1/files"), Some(Role::Operator));
+        assert_eq!(required_role(&post, "/deliveries/1/devices/import"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/devices"), Some(Role::Senior));
         assert_eq!(required_role(&put, "/modules/1"), Some(Role::Senior));
+        assert_eq!(required_role(&put, "/inventory/1"), Some(Role::Operator));
         assert_eq!(required_role(&get, "/users"), Some(Role::Admin));
         assert_eq!(required_role(&post, "/invites"), Some(Role::Admin));
+        assert_eq!(required_role(&get, "/settings"), Some(Role::Operator));
+        assert_eq!(required_role(&put, "/settings"), Some(Role::Admin));
     }
 }

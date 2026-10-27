@@ -1,16 +1,17 @@
 import './styles.css';
-import { ArrowLeft, Check, Download, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Check, Download, FileUp, Printer, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useCan } from '../../core/auth/context';
 import { STAGES, conditionLabel, destinationLabel } from '../../core/domain';
-import { downloadCsv, formatDate } from '../../core/ui/format';
+import { download, formatDate } from '../../core/ui/format';
 import { ErrorBanner } from '../../core/ui/ui';
 import { AuditList } from '../audit/AuditPage';
 import { ScanPanel } from '../locations/ScanPanel';
-import { type DeliveryDetail, getDeliveryWarnings } from './api';
+import { FileImportDialog } from '../reports/ExportImport';
+import { type DeliveryDetail, deliveryTemplateUrl, getDeliveryWarnings } from './api';
 import { DeliveryFiles } from './DeliveryFiles';
-import { useAdvanceDelivery, useDelivery } from './hooks';
+import { useAdvanceDelivery, useDelivery, useImportDeviceData } from './hooks';
 import { StageBadge } from './StageBadge';
 
 /** F-03: карточка поставки — шапка, этапы, строки с диапазонами Index, устройства. */
@@ -154,6 +155,7 @@ const placedCount = (d: DeliveryDetail) => d.devices.filter((v) => v.location).l
 
 function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
   const [filter, setFilter] = useState('');
+  const [importing, setImporting] = useState(false);
   const needle = filter.trim().toLowerCase();
   const rows = needle
     ? delivery.devices.filter((v) =>
@@ -183,15 +185,13 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
         <button
           type="button"
           className="btn ghost"
-          onClick={() =>
-            downloadCsv(
-              `${delivery.number}.csv`,
-              ['Index', 'UUID', 'Производитель', 'Модель', 'Место'],
-              delivery.devices.map((v) => [v.device_index, v.id, v.manufacturer, v.model, v.location]),
-            )
-          }
+          title="Устройства поставки с колонками MAC и серийного номера для заполнения"
+          onClick={() => download(deliveryTemplateUrl(delivery.id, 'xlsx'))}
         >
-          <Download size={16} /> CSV для наклеек
+          <Download size={16} /> Шаблон
+        </button>
+        <button type="button" className="btn ghost" onClick={() => setImporting(true)}>
+          <FileUp size={16} /> Загрузить MAC и серийные
         </button>
       </div>
       <div className="table-wrap scroll">
@@ -224,6 +224,33 @@ function DevicesCard({ delivery }: { delivery: DeliveryDetail }) {
           </tbody>
         </table>
       </div>
+      {importing && <DeviceDataImport delivery={delivery} onClose={() => setImporting(false)} />}
     </section>
+  );
+}
+
+/** Шаблон поставки: загрузка MAC и серийных номеров устройств из заполненного файла. */
+function DeviceDataImport({ delivery, onClose }: { delivery: DeliveryDetail; onClose: () => void }) {
+  return (
+    <FileImportDialog
+      title={`Данные устройств ${delivery.number}`}
+      description={
+        <>
+          Заполните колонки «MAC» и «Серийный номер» в шаблоне поставки (или в любом файле CSV/XLSX с колонкой
+          «INDEX») и загрузите его. MAC принимается в любом написании и сохраняется как CE:0B:0C:00:29:0A;
+          пустая ячейка не стирает уже записанное значение. Каждое изменение попадает в журнал.
+        </>
+      }
+      check={useImportDeviceData(delivery.id, true)}
+      run={useImportDeviceData(delivery.id, false)}
+      labels={{
+        created: 'изменено устройств',
+        planned: 'будет изменено устройств',
+        skipped: 'без изменений',
+        submit: 'Загрузить',
+        done: 'Данные загружены',
+      }}
+      onClose={onClose}
+    />
   );
 }

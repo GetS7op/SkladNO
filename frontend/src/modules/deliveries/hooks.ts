@@ -1,9 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   advanceDelivery,
   createDelivery,
   type DeliveryListParams,
   getDelivery,
+  getDevice,
+  INVENTORY_PAGE,
+  type InventoryParams,
+  listInventory,
+  updateDevice,
+  importDeviceData,
   listDeliveries,
   listDeliveryFiles,
   listDeliveryGroups,
@@ -18,6 +24,8 @@ export const deliveryKeys = {
   files: (id: string) => ['deliveries', 'files', id] as const,
   groups: ['deliveries', 'groups'] as const,
   indexRanges: ['deliveries', 'index-ranges'] as const,
+  inventory: (params: InventoryParams) => ['deliveries', 'inventory', params] as const,
+  device: (id: string) => ['deliveries', 'device', id] as const,
 };
 
 /** После действий с поставкой меняются карта, склады, журнал — их тоже обновляем. */
@@ -68,6 +76,19 @@ export function useAdvanceDelivery() {
   });
 }
 
+/** Загрузка данных устройств из шаблона; после настоящей загрузки обновляет поставку и журнал. */
+export function useImportDeviceData(id: string, dryRun: boolean) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => importDeviceData({ id, file, dryRun }),
+    onSuccess() {
+      if (dryRun) return;
+      void queryClient.invalidateQueries({ queryKey: deliveryKeys.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+}
+
 export function useDeliveryFiles(id: string) {
   return useQuery({ queryFn: () => listDeliveryFiles(id), queryKey: deliveryKeys.files(id) });
 }
@@ -80,6 +101,33 @@ export function useUploadDeliveryFiles(id: string) {
     },
     onSettled() {
       void queryClient.invalidateQueries({ queryKey: deliveryKeys.files(id) });
+      void queryClient.invalidateQueries({ queryKey: ['audit'] });
+    },
+  });
+}
+
+/** Реестр INDEX постранично: «Показать ещё» догружает следующие 100 устройств. */
+export function useInventory(params: InventoryParams) {
+  return useInfiniteQuery({
+    queryKey: deliveryKeys.inventory(params),
+    queryFn: ({ pageParam }) => listInventory(params, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last) =>
+      last.offset + INVENTORY_PAGE < last.total ? last.offset + INVENTORY_PAGE : undefined,
+    placeholderData: (previous) => previous,
+  });
+}
+
+export const useDevice = (id: string) =>
+  useQuery({ queryKey: deliveryKeys.device(id), queryFn: () => getDevice(id) });
+
+export function useUpdateDevice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateDevice,
+    onSuccess(card) {
+      queryClient.setQueryData(deliveryKeys.device(card.id), card);
+      void queryClient.invalidateQueries({ queryKey: deliveryKeys.all });
       void queryClient.invalidateQueries({ queryKey: ['audit'] });
     },
   });

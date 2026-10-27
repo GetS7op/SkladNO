@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { apiGet, apiPost, apiUpload, apiUrl, withQuery } from '../../core/api/client';
+import { apiGet, apiPost, apiPut, apiUpload, apiUrl, withQuery } from '../../core/api/client';
+import { importReportSchema } from '../reports/api';
 import {
   type Condition,
   conditionSchema,
@@ -114,3 +115,71 @@ export const uploadDeliveryFile = ({ id, file }: { id: string; file: File }) =>
   apiUpload(withQuery(`/deliveries/${id}/files`, { name: file.name }), file, deliveryFileSchema);
 
 export const deliveryFileUrl = (fileId: string) => apiUrl(`/files/${fileId}`);
+
+/** Шаблон поставки: устройства с колонками MAC и серийного номера. */
+export const deliveryTemplateUrl = (id: string, format: 'xlsx' | 'csv') =>
+  apiUrl(withQuery(`/deliveries/${id}/template`, { format }));
+
+/** Загрузка заполненного шаблона; `created` — устройства с изменёнными данными. */
+export const importDeviceData = ({ id, file, dryRun }: { id: string; file: File; dryRun: boolean }) =>
+  apiUpload(withQuery(`/deliveries/${id}/devices/import`, { dry_run: dryRun }), file, importReportSchema);
+
+/** Реестр INDEX: устройство из любой поставки. */
+const inventoryItemSchema = z.object({
+  id: z.string(),
+  device_index: z.string(),
+  mac_address: z.string().nullable(),
+  serial_no: z.string().nullable(),
+  destination: destinationSchema,
+  manufacturer: z.string(),
+  model: z.string(),
+  hashrate_ths: z.number().nullable(),
+  power_w: z.number().int().nullable(),
+  client_name: z.string(),
+  delivery_id: z.string(),
+  delivery_number: z.string(),
+  delivery_date: z.string(),
+  stage: stageSchema,
+  location: z.string().nullable(),
+});
+export type InventoryItem = z.infer<typeof inventoryItemSchema>;
+
+const inventoryPageSchema = z.object({
+  items: z.array(inventoryItemSchema),
+  total: z.number().int(),
+  offset: z.number().int(),
+  limit: z.number().int(),
+});
+
+/** Карточка устройства: данные и история изменений (когда, кто, было → стало). */
+const deviceCardSchema = inventoryItemSchema.extend({
+  created_at: z.string(),
+  history: z.array(
+    z.object({
+      at: z.string(),
+      actor: z.string(),
+      action: z.string(),
+      changes: z.record(z.string(), z.unknown()),
+    }),
+  ),
+});
+export type DeviceCard = z.infer<typeof deviceCardSchema>;
+
+export type InventoryParams = { q: string; destination: string; placement: string };
+
+export const INVENTORY_PAGE = 100;
+
+export const listInventory = (params: InventoryParams, offset: number) =>
+  apiGet(withQuery('/inventory', { ...params, offset, limit: INVENTORY_PAGE }), inventoryPageSchema);
+
+export const getDevice = (id: string) => apiGet(`/inventory/${id}`, deviceCardSchema);
+
+export const updateDevice = ({
+  id,
+  mac_address,
+  serial_no,
+}: {
+  id: string;
+  mac_address: string | null;
+  serial_no: string | null;
+}) => apiPut(`/inventory/${id}`, { mac_address, serial_no }, deviceCardSchema);

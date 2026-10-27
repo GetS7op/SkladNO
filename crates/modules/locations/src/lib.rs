@@ -5,17 +5,19 @@ mod address;
 mod containers;
 mod map;
 mod modules;
+mod settings;
 
 use axum::Router;
 use skladno_core::Db;
 
-pub use address::{Address, format_address};
+pub use address::Address;
 
 pub fn router() -> Router<Db> {
     Router::new()
         .merge(containers::router())
         .merge(modules::router())
         .merge(map::router())
+        .merge(settings::router())
 }
 
 pub(crate) fn warehouse_label(value: &str) -> &'static str {

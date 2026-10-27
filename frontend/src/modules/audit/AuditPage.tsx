@@ -17,6 +17,7 @@ const ENTITY_LABELS: Record<string, string> = {
   module: 'Модуль',
   user: 'Пользователь',
   invite: 'Приглашение',
+  settings: 'Настройки',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -71,6 +72,9 @@ const FIELD_LABELS: Record<string, string> = {
   containers_removed: 'Убрано контейнеров',
   containers_retyped: 'Сменён тип',
   file: 'Файл',
+  address_separator: 'Разделитель адреса',
+  mac_address: 'MAC',
+  serial_no: 'Серийный номер',
   warnings: 'Замечания',
   models: 'Моделей',
   clients: 'Клиентов',

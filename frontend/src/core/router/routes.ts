@@ -6,7 +6,9 @@ import {
   Map,
   Network,
   PackagePlus,
+  ScanBarcode,
   Server,
+  Settings,
   ShieldCheck,
   Users,
   Warehouse,
@@ -29,6 +31,7 @@ export const NAV: NavSection[] = [
     title: 'Учёт',
     items: [
       { to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' },
+      { to: '/inventory', label: 'Реестр INDEX', icon: ScanBarcode, minRole: 'operator' },
       { to: '/devices', label: 'Устройства', icon: Cpu, minRole: 'operator' },
       { to: '/clients', label: 'Клиенты', icon: Users, minRole: 'operator' },
     ],
@@ -54,6 +57,7 @@ export const NAV: NavSection[] = [
     items: [
       { to: '/audit', label: 'Журнал', icon: History, minRole: 'operator' },
       { to: '/users', label: 'Пользователи', icon: ShieldCheck, minRole: 'admin' },
+      { to: '/settings', label: 'Настройки', icon: Settings, minRole: 'admin' },
     ],
   },
 ];

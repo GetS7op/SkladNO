@@ -7,6 +7,8 @@ import { formatNumber } from '../../core/ui/format';
 import { Segmented } from '../../core/ui/ui';
 import type { MapData, MapInstance } from './api';
 import { useMap, useShelf } from './hooks';
+import { formatAddress } from '../settings/api';
+import { useAddressSeparator } from '../settings/hooks';
 import { ScanPanel } from './ScanPanel';
 
 /** F-09. Карта местоположений: модуль → контейнер → стеллаж → полка (адрес MXCXSXP). */
@@ -14,6 +16,7 @@ export function MapPage() {
   const [warehouse, setWarehouse] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const map = useMap(warehouse);
+  const separator = useAddressSeparator();
 
   const modules = groupByModule(map.data);
 
@@ -23,7 +26,8 @@ export function MapPage() {
         <div>
           <h1>Карта местоположений</h1>
           <p className="muted">
-            Адрес полки: модуль X контейнер X стеллаж X полка. Клик по полке — что на ней.
+            Адрес полки: {['модуль', 'контейнер', 'стеллаж', 'полка'].join(` ${separator} `)}. Клик по полке —
+            что на ней.
           </p>
         </div>
       </header>
@@ -101,6 +105,7 @@ function InstanceGrid(props: {
   onSelect: (code: string) => void;
 }) {
   const { instance: i } = props;
+  const separator = useAddressSeparator();
   const count = (rack: number, shelf: number) =>
     props.counts.find((c) => c.module_container_id === i.id && c.rack === rack && c.shelf === shelf)?.count ??
     0;
@@ -127,7 +132,7 @@ function InstanceGrid(props: {
           <div key={rack} className="rack">
             {shelves.map((shelf) => {
               const n = count(rack, shelf);
-              const code = `${i.module_number}X${i.number}X${rack}X${shelf}`;
+              const code = formatAddress(separator, i.module_number, i.number, rack, shelf);
               const state = n === 0 ? '' : n >= i.devices_per_shelf ? 'full' : 'partial';
               return (
                 <button

@@ -1,6 +1,7 @@
 //! Импорт и экспорт (сквозная тема SPEC): выгрузка реестров в CSV, XLSX и MD со статистикой,
 //! загрузка справочников из CSV и XLSX.
 
+mod device_data;
 mod import;
 mod registries;
 mod table;
@@ -25,6 +26,12 @@ pub fn router() -> Router<Db> {
         .route(
             "/import/{name}",
             post(import::import).layer(DefaultBodyLimit::max(20 * 1024 * 1024)),
+        )
+        // Шаблон поставки: устройства с колонками MAC и серийного номера — и загрузка обратно.
+        .route("/deliveries/{id}/template", get(device_data::template))
+        .route(
+            "/deliveries/{id}/devices/import",
+            post(device_data::import).layer(DefaultBodyLimit::max(20 * 1024 * 1024)),
         )
 }
 

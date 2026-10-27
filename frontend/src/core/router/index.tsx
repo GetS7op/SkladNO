@@ -21,6 +21,15 @@ const DeliveriesPage = lazy(() =>
 const DeliveryCreatePage = lazy(() =>
   import('../../modules/deliveries/DeliveryCreatePage').then((m) => ({ default: m.DeliveryCreatePage })),
 );
+const InventoryPage = lazy(() =>
+  import('../../modules/deliveries/InventoryPage').then((m) => ({ default: m.InventoryPage })),
+);
+const DevicePage = lazy(() =>
+  import('../../modules/deliveries/DevicePage').then((m) => ({ default: m.DevicePage })),
+);
+const SettingsPage = lazy(() =>
+  import('../../modules/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
 const DeliveryPage = lazy(() =>
   import('../../modules/deliveries/DeliveryPage').then((m) => ({ default: m.DeliveryPage })),
 );
@@ -101,6 +110,8 @@ export function AppRouter() {
                 <Route path="deliveries" element={<DeliveriesPage />} />
                 <Route path="deliveries/new" element={<DeliveryCreatePage />} />
                 <Route path="deliveries/:id" element={<DeliveryPage />} />
+                <Route path="inventory" element={<InventoryPage />} />
+                <Route path="inventory/:id" element={<DevicePage />} />
                 <Route path="devices" element={<DevicesPage />} />
                 <Route path="clients" element={<ClientsPage />} />
                 <Route path="warehouses" element={<WarehousesPage />} />
@@ -117,6 +128,14 @@ export function AppRouter() {
                   element={
                     <RoleRoute min="admin">
                       <UsersPage />
+                    </RoleRoute>
+                  }
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <RoleRoute min="admin">
+                      <SettingsPage />
                     </RoleRoute>
                   }
                 />

@@ -20,7 +20,13 @@ describe('formatDimensions', () => {
 
 describe('toCsv', () => {
   it('quotes separators and starts with BOM for Excel', () => {
-    const csv = toCsv(['Имя', 'Кол-во'], [['А; Б', 3], [null, 'x"y']]);
+    const csv = toCsv(
+      ['Имя', 'Кол-во'],
+      [
+        ['А; Б', 3],
+        [null, 'x"y'],
+      ],
+    );
     expect(csv.startsWith('﻿')).toBe(true);
     expect(csv).toContain('"А; Б";3');
     expect(csv).toContain(';"x""y"');

@@ -2,6 +2,7 @@
 
 mod files;
 mod index;
+mod inventory;
 
 pub use index::{device_uuid, format_index};
 
@@ -162,6 +163,7 @@ pub fn router() -> Router<Db> {
         .route("/deliveries/{id}/advance", post(advance))
         .route("/deliveries/{id}/warnings", get(warnings))
         .merge(files::router())
+        .merge(inventory::router())
 }
 
 async fn list(
@@ -228,7 +230,7 @@ async fn load(db: &Db, id: Uuid) -> AppResult<DeliveryDetail> {
     .await?;
     let devices = sqlx::query_as::<_, DeviceRow>(
         "SELECT v.id, v.device_index, m.manufacturer, m.model, v.mac_address, v.serial_no, \
-         md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location \
+         skladno_address(md.number, mc.number, p.rack, p.shelf) AS location \
          FROM devices v JOIN device_models m ON m.id = v.model_id \
          LEFT JOIN device_placements p ON p.device_id = v.id \
          LEFT JOIN module_containers mc ON mc.id = p.module_container_id \

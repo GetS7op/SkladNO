@@ -144,7 +144,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, InventoryRow>(
         "SELECT v.device_index, v.id, m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client, \
          d.number, d.delivery_date, v.destination, d.stage, \
-         md.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS location, \
+         skladno_address(md.number, mc.number, p.rack, p.shelf) AS location, \
          v.mac_address, v.serial_no \
          FROM devices v JOIN device_models m ON m.id = v.model_id JOIN deliveries d ON d.id = v.delivery_id \
          JOIN clients c ON c.id = d.client_id LEFT JOIN device_placements p ON p.device_id = v.id \

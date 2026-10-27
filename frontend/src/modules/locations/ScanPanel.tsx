@@ -5,6 +5,8 @@ import { formatDateTime } from '../../core/ui/format';
 import type { PlaceResult } from './api';
 import { useRefreshAfterPlacement } from './hooks';
 import { useScanQueue } from './scanQueue';
+import { formatAddress } from '../settings/api';
+import { useAddressSeparator } from '../settings/hooks';
 
 interface LogEntry {
   id: number;
@@ -28,6 +30,7 @@ const describe = (r: PlaceResult) => {
  */
 export function ScanPanel({ hint }: { hint?: string }) {
   const refresh = useRefreshAfterPlacement();
+  const separator = useAddressSeparator();
   const [shelf, setShelf] = useState('');
   const [index, setIndex] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -95,7 +98,7 @@ export function ScanPanel({ hint }: { hint?: string }) {
                 indexRef.current?.focus();
               }
             }}
-            placeholder="1X2X3X4"
+            placeholder={formatAddress(separator, 1, 2, 3, 4)}
           />
         </label>
         <label className="field">

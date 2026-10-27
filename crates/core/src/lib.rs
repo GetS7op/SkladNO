@@ -3,6 +3,7 @@
 pub mod audit;
 pub mod auth;
 pub mod error;
+pub mod settings;
 pub mod text;
 
 pub use error::{AppError, AppResult};

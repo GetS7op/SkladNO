@@ -1,31 +1,39 @@
 import './styles.css';
+import type { UseMutationResult } from '@tanstack/react-query';
 import { FileUp } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { ErrorBanner, Modal } from '../../core/ui/ui';
-import type { ImportRegistry } from './api';
+import type { ImportRegistry, ImportReport } from './api';
 import { useImportRegistry } from './hooks';
 
-const TEMPLATES = {
-  devices: 'Производитель, Модель, XP (Th/s), Потребление (Вт), Размеры (мм), Вес (кг)',
-  clients: 'Наименование, Заметка',
-};
+type FileMutation = UseMutationResult<ImportReport, Error, File>;
 
-/** Импорт справочника: сначала проверка без записи, затем загрузка. */
-export function ImportDialog({ registry, onClose }: { registry: ImportRegistry; onClose: () => void }) {
+/**
+ * Загрузка файла CSV/XLSX в два шага: «Проверить» (сервер всё проверяет и откатывает) и
+ * «Загрузить». `check` и `run` — мутации с пробным и настоящим прогоном.
+ */
+export function FileImportDialog(props: {
+  title: string;
+  description: ReactNode;
+  check: FileMutation;
+  run: FileMutation;
+  /** Подписи итогов: что считается «добавлено» и «без изменений». */
+  labels: { created: string; planned: string; skipped: string; submit: string; done: string };
+  onClose: () => void;
+}) {
+  const { check, run, labels, onClose } = props;
   const [file, setFile] = useState<File | null>(null);
-  const check = useImportRegistry();
-  const run = useImportRegistry();
   const report = run.data ?? check.data;
   const done = !!run.data;
 
   return (
     <Modal
-      title={registry === 'devices' ? 'Импорт моделей устройств' : 'Импорт клиентов'}
+      title={props.title}
       onClose={onClose}
       onSubmit={() => {
         if (done || !file) return onClose();
-        if (!check.data) check.mutate({ registry, file, dryRun: true });
-        else run.mutate({ registry, file, dryRun: false });
+        if (!check.data) check.mutate(file);
+        else run.mutate(file);
       }}
       footer={
         <>
@@ -41,17 +49,14 @@ export function ImportDialog({ registry, onClose }: { registry: ImportRegistry; 
                 !file || check.isPending || run.isPending || (!!check.data && check.data.created === 0)
               }
             >
-              {check.data ? `Импортировать (${check.data.created})` : 'Проверить файл'}
+              {check.data ? `${labels.submit} (${check.data.created})` : 'Проверить файл'}
             </button>
           )}
         </>
       }
     >
       <ErrorBanner error={check.error ?? run.error} />
-      <p className="muted small">
-        Файл CSV или XLSX с шапкой: {TEMPLATES[registry]}. Подойдёт выгрузка SkladNO. Записи, которые уже
-        есть, пропускаются; каждая строка проверяется по тем же правилам, что ручной ввод.
-      </p>
+      <p className="muted small">{props.description}</p>
       <label className="file-input">
         <FileUp size={18} />
         <span>{file ? file.name : 'Выберите файл .csv или .xlsx'}</span>
@@ -67,9 +72,9 @@ export function ImportDialog({ registry, onClose }: { registry: ImportRegistry; 
       </label>
       {report && (
         <div className={`banner ${report.errors.length ? 'warn-banner' : 'ok'}`}>
-          <b>{done ? 'Импорт выполнен' : 'Проверка (ничего не записано)'}:</b> строк {report.total},{' '}
-          {done ? 'добавлено' : 'будет добавлено'} {report.created}, уже есть {report.skipped}, с ошибками{' '}
-          {report.errors.length}.
+          <b>{done ? labels.done : 'Проверка (ничего не записано)'}:</b> строк {report.total},{' '}
+          {done ? labels.created : labels.planned} {report.created}, {labels.skipped} {report.skipped}, с
+          ошибками {report.errors.length}.
           {report.errors.length > 0 && (
             <ul className="import-errors">
               {report.errors.slice(0, 50).map((e) => (
@@ -83,5 +88,35 @@ export function ImportDialog({ registry, onClose }: { registry: ImportRegistry; 
         </div>
       )}
     </Modal>
+  );
+}
+
+const TEMPLATES = {
+  devices: 'Производитель, Модель, XP (Th/s), Потребление (Вт), Размеры (мм), Вес (кг)',
+  clients: 'Наименование, Заметка',
+};
+
+/** Импорт справочника (модели устройств, клиенты). */
+export function ImportDialog({ registry, onClose }: { registry: ImportRegistry; onClose: () => void }) {
+  return (
+    <FileImportDialog
+      title={registry === 'devices' ? 'Импорт моделей устройств' : 'Импорт клиентов'}
+      description={
+        <>
+          Файл CSV или XLSX с шапкой: {TEMPLATES[registry]}. Подойдёт выгрузка SkladNO. Записи, которые уже
+          есть, пропускаются; каждая строка проверяется по тем же правилам, что ручной ввод.
+        </>
+      }
+      check={useImportRegistry(registry, true)}
+      run={useImportRegistry(registry, false)}
+      labels={{
+        created: 'добавлено',
+        planned: 'будет добавлено',
+        skipped: 'уже есть',
+        submit: 'Импортировать',
+        done: 'Импорт выполнен',
+      }}
+      onClose={onClose}
+    />
   );
 }

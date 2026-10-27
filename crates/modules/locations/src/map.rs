@@ -10,7 +10,9 @@ use serde_json::json;
 use skladno_core::{AppError, AppResult, Db, audit, text};
 use uuid::Uuid;
 
-use crate::{address::Address, format_address, warehouse_label};
+use skladno_core::settings::address_separator;
+
+use crate::{address::Address, warehouse_label};
 
 pub fn router() -> Router<Db> {
     Router::new()
@@ -96,7 +98,7 @@ struct Target {
 
 /// Находит полку по адресу и проверяет, что стеллаж и полка есть в шаблоне контейнера.
 /// В транзакции приёма экземпляр контейнера блокируется: размещения в него идут по одному.
-async fn resolve<'e, E: sqlx::PgExecutor<'e>>(executor: E, address: Address, lock: bool) -> AppResult<Target> {
+async fn resolve<'e, E: sqlx::PgExecutor<'e>>(executor: E, address: &Address, lock: bool) -> AppResult<Target> {
     let lock_clause = if lock { " FOR UPDATE OF mc FOR SHARE OF c, m" } else { "" };
     let target = sqlx::query_as::<_, Target>(&format!(
         "SELECT mc.id AS module_container_id, m.warehouse, c.racks, c.shelves_per_rack, c.devices_per_shelf, c.power_kw \
@@ -144,8 +146,9 @@ struct ShelfResponse {
 }
 
 async fn shelf(State(db): State<Db>, Query(query): Query<ShelfQuery>) -> AppResult<Json<ShelfResponse>> {
-    let address = Address::parse(&query.code).map_err(AppError::Validation)?;
-    let target = resolve(&db, address, false).await?;
+    let separator = address_separator(&db).await?;
+    let address = Address::parse(&query.code, &separator).map_err(AppError::Validation)?;
+    let target = resolve(&db, &address, false).await?;
     let devices = sqlx::query_as::<_, ShelfDevice>(
         "SELECT d.device_index, mo.manufacturer, mo.model, del.number AS delivery_number FROM device_placements p \
          JOIN devices d ON d.id = p.device_id JOIN device_models mo ON mo.id = d.model_id \
@@ -220,11 +223,12 @@ fn normalize_index(raw: &str) -> AppResult<String> {
 }
 
 async fn place(State(db): State<Db>, Json(input): Json<PlaceInput>) -> AppResult<Json<PlaceResult>> {
-    let address = Address::parse(&input.shelf_code).map_err(AppError::Validation)?;
+    let separator = address_separator(&db).await?;
+    let address = Address::parse(&input.shelf_code, &separator).map_err(AppError::Validation)?;
     let device_index = normalize_index(&input.device_index)?;
 
     let mut tx = db.begin().await?;
-    let target = resolve(&mut *tx, address, true).await?;
+    let target = resolve(&mut *tx, &address, true).await?;
 
     let device = sqlx::query_as::<_, ScannedDevice>(
         "SELECT d.id, d.device_index, d.destination, del.stage, del.id AS delivery_id, del.number AS delivery_number, \
@@ -253,7 +257,7 @@ async fn place(State(db): State<Db>, Json(input): Json<PlaceInput>) -> AppResult
 
     let current = sqlx::query_as::<_, CurrentPlacement>(
         "SELECT p.module_container_id, p.rack, p.shelf, \
-         m.number::text || 'X' || mc.number::text || 'X' || p.rack::text || 'X' || p.shelf::text AS address \
+         skladno_address(m.number, mc.number, p.rack, p.shelf) AS address \
          FROM device_placements p JOIN module_containers mc ON mc.id = p.module_container_id \
          JOIN modules m ON m.id = mc.module_id WHERE p.device_id = $1 FOR UPDATE OF p",
     )
@@ -336,7 +340,7 @@ async fn place(State(db): State<Db>, Json(input): Json<PlaceInput>) -> AppResult
     tx.commit().await?;
 
     Ok(Json(PlaceResult {
-        address: format_address(address.module, address.container, address.rack, address.shelf),
+        address: address.to_string(),
         device_index: device.device_index,
         manufacturer: device.manufacturer,
         model: device.model,
