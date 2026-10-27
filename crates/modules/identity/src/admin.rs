@@ -17,7 +17,7 @@ use skladno_core::{
 };
 use uuid::Uuid;
 
-use crate::secrets;
+use crate::{secrets, throttle::LOGIN_THROTTLE};
 
 pub fn router() -> Router<Db> {
     Router::new()
@@ -72,15 +72,20 @@ async fn update_user(
     Json(input): Json<UserUpdate>,
 ) -> AppResult<Json<UserRow>> {
     admin()?;
-    let role = Role::parse(&input.role).ok_or_else(|| AppError::Validation("Неизвестная роль".into()))?;
+    let role =
+        Role::parse(&input.role).ok_or_else(|| AppError::Validation("Неизвестная роль".into()))?;
     let mut tx = db.begin().await?;
     // Все изменения администраторов идут по одному — проверка «последнего администратора» без гонок.
-    sqlx::query("SELECT pg_advisory_xact_lock(7303)").execute(&mut *tx).await?;
-    let (old_role, old_active) = sqlx::query_as::<_, (String, bool)>("SELECT role, active FROM users WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Пользователь не найден".into()))?;
+    sqlx::query("SELECT pg_advisory_xact_lock(7303)")
+        .execute(&mut *tx)
+        .await?;
+    let (old_role, old_active) = sqlx::query_as::<_, (String, bool)>(
+        "SELECT role, active FROM users WHERE id = $1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Пользователь не найден".into()))?;
 
     let loses_admin = old_role == "admin" && old_active && (role != Role::Admin || !input.active);
     if loses_admin {
@@ -104,7 +109,10 @@ async fn update_user(
         .execute(&mut *tx)
         .await?;
     if !input.active {
-        sqlx::query("DELETE FROM sessions WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM sessions WHERE user_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
     }
     audit::record(
         &mut *tx,
@@ -117,10 +125,11 @@ async fn update_user(
         ),
     )
     .await?;
-    let row = sqlx::query_as::<_, UserRow>(&format!("SELECT {USER_COLUMNS} FROM users WHERE id = $1"))
-        .bind(id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let row =
+        sqlx::query_as::<_, UserRow>(&format!("SELECT {USER_COLUMNS} FROM users WHERE id = $1"))
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
     tx.commit().await?;
     Ok(Json(row))
 }
@@ -131,22 +140,28 @@ struct TemporaryPassword {
 }
 
 /// Сброс пароля: администратор получает временный пароль один раз, все сессии пользователя закрываются.
-async fn reset_password(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<TemporaryPassword>> {
+async fn reset_password(
+    State(db): State<Db>,
+    Path(id): Path<Uuid>,
+) -> AppResult<Json<TemporaryPassword>> {
     admin()?;
     let password = secrets::temporary_password();
     let mut tx = db.begin().await?;
-    let updated = sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+    let login = sqlx::query_scalar::<_, String>(
+        "UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING login",
+    )
+    .bind(id)
+    .bind(secrets::hash_password(&password)?)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Пользователь не найден".into()))?;
+    sqlx::query("DELETE FROM sessions WHERE user_id = $1")
         .bind(id)
-        .bind(secrets::hash_password(&password)?)
         .execute(&mut *tx)
-        .await?
-        .rows_affected();
-    if updated == 0 {
-        return Err(AppError::NotFound("Пользователь не найден".into()));
-    }
-    sqlx::query("DELETE FROM sessions WHERE user_id = $1").bind(id).execute(&mut *tx).await?;
+        .await?;
     audit::record(&mut *tx, "user", id, "reset_password", json!({})).await?;
     tx.commit().await?;
+    LOGIN_THROTTLE.reset(&login);
     Ok(Json(TemporaryPassword { password }))
 }
 
@@ -173,9 +188,11 @@ const INVITE_SELECT: &str = "SELECT i.id, i.role, i.note, i.expires_at, i.create
 
 async fn list_invites(State(db): State<Db>) -> AppResult<Json<Vec<InviteRow>>> {
     admin()?;
-    let rows = sqlx::query_as::<_, InviteRow>(&format!("{INVITE_SELECT} ORDER BY i.created_at DESC LIMIT 200"))
-        .fetch_all(&db)
-        .await?;
+    let rows = sqlx::query_as::<_, InviteRow>(&format!(
+        "{INVITE_SELECT} ORDER BY i.created_at DESC LIMIT 200"
+    ))
+    .fetch_all(&db)
+    .await?;
     Ok(Json(rows))
 }
 
@@ -199,9 +216,12 @@ async fn create_invite(
     Json(input): Json<InviteInput>,
 ) -> AppResult<(StatusCode, Json<CreatedInvite>)> {
     let user = admin()?;
-    let role = Role::parse(&input.role).ok_or_else(|| AppError::Validation("Неизвестная роль".into()))?;
+    let role =
+        Role::parse(&input.role).ok_or_else(|| AppError::Validation("Неизвестная роль".into()))?;
     if input.days.is_some_and(|d| !(1..=365).contains(&d)) {
-        return Err(AppError::Validation("Срок действия: от 1 до 365 дней или бессрочно".into()));
+        return Err(AppError::Validation(
+            "Срок действия: от 1 до 365 дней или бессрочно".into(),
+        ));
     }
     let token = secrets::new_token();
     let expires_at = input.days.map(|d| Utc::now() + Duration::days(d));
@@ -216,13 +236,26 @@ async fn create_invite(
     .bind(user.id)
     .fetch_one(&mut *tx)
     .await?;
-    audit::record(&mut *tx, "invite", id, "create", json!({ "role": role.as_str(), "expires_at": expires_at })).await?;
+    audit::record(
+        &mut *tx,
+        "invite",
+        id,
+        "create",
+        json!({ "role": role.as_str(), "expires_at": expires_at }),
+    )
+    .await?;
     let invite = sqlx::query_as::<_, InviteRow>(&format!("{INVITE_SELECT} WHERE i.id = $1"))
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, Json(CreatedInvite { invite, path: format!("/invite/{token}") })))
+    Ok((
+        StatusCode::CREATED,
+        Json(CreatedInvite {
+            invite,
+            path: format!("/invite/{token}"),
+        }),
+    ))
 }
 
 async fn revoke_invite(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<StatusCode> {
@@ -234,7 +267,9 @@ async fn revoke_invite(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<
         .await?
         .rows_affected();
     if revoked == 0 {
-        return Err(AppError::Conflict("Приглашение уже использовано или отозвано".into()));
+        return Err(AppError::Conflict(
+            "Приглашение уже использовано или отозвано".into(),
+        ));
     }
     audit::record(&mut *tx, "invite", id, "revoke", json!({})).await?;
     tx.commit().await?;

@@ -4,6 +4,7 @@ mod admin;
 mod profile;
 mod routes;
 mod secrets;
+mod throttle;
 
 use axum::{
     Router,
@@ -64,7 +65,11 @@ async fn create_session<'e, E: sqlx::PgExecutor<'e>>(
         .bind(Utc::now() + Duration::days(SESSION_DAYS))
         .execute(executor)
         .await?;
-    Ok(session_cookie(&token, SESSION_DAYS * 24 * 60 * 60, is_https(headers)))
+    Ok(session_cookie(
+        &token,
+        SESSION_DAYS * 24 * 60 * 60,
+        is_https(headers),
+    ))
 }
 
 #[derive(sqlx::FromRow)]
@@ -115,7 +120,12 @@ mod tests {
     fn cookie_is_secure_only_behind_https() {
         let mut headers = HeaderMap::new();
         assert!(!is_https(&headers));
-        assert!(!session_cookie("abc", 60, false).to_str().unwrap().contains("Secure"));
+        assert!(
+            !session_cookie("abc", 60, false)
+                .to_str()
+                .unwrap()
+                .contains("Secure")
+        );
         headers.insert("x-forwarded-proto", HeaderValue::from_static("https"));
         assert!(is_https(&headers));
         let cookie = session_cookie("abc", 60, true);
@@ -125,7 +135,10 @@ mod tests {
     #[test]
     fn reads_session_token_from_cookie_header() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::COOKIE, HeaderValue::from_static("a=1; skladno_session=tok; b=2"));
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("a=1; skladno_session=tok; b=2"),
+        );
         assert_eq!(session_token(&headers), Some("tok"));
     }
 }

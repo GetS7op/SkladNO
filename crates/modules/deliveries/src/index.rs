@@ -13,7 +13,10 @@ pub fn format_index(value: i32) -> String {
 /// UUID v5 (SHA-1) от Index: один и тот же Index всегда даёт один и тот же UUID,
 /// поэтому ТСД и сервер вычисляют идентификатор устройства независимо.
 pub fn device_uuid(index: &str) -> Uuid {
-    Uuid::new_v5(&DEVICE_NAMESPACE, format!("skladno:device:{index}").as_bytes())
+    Uuid::new_v5(
+        &DEVICE_NAMESPACE,
+        format!("skladno:device:{index}").as_bytes(),
+    )
 }
 
 /// Выделяет `count` подряд идущих Index начиная с `next`. None — диапазон исчерпан (Q-04).
@@ -41,8 +44,14 @@ mod tests {
 
     #[test]
     fn allocation_respects_range() {
-        assert_eq!(allocate(1, 8999999, 3).unwrap(), ["0000001", "0000002", "0000003"]);
-        assert_eq!(allocate(9999998, 9999999, 2).unwrap(), ["9999998", "9999999"]);
+        assert_eq!(
+            allocate(1, 8999999, 3).unwrap(),
+            ["0000001", "0000002", "0000003"]
+        );
+        assert_eq!(
+            allocate(9999998, 9999999, 2).unwrap(),
+            ["9999998", "9999999"]
+        );
         assert!(allocate(9999998, 9999999, 3).is_none());
         assert!(allocate(1, 10, 0).is_none());
     }

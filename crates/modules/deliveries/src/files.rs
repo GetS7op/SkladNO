@@ -24,7 +24,9 @@ pub fn router() -> Router<Db> {
     Router::new()
         .route(
             "/deliveries/{id}/files",
-            get(list).post(upload).layer(DefaultBodyLimit::max(MAX_FILE_BYTES)),
+            get(list)
+                .post(upload)
+                .layer(DefaultBodyLimit::max(MAX_FILE_BYTES)),
         )
         .route("/files/{id}", get(download))
 }
@@ -65,11 +67,21 @@ fn safe_name(name: &str, extension: &str) -> String {
         .unwrap_or("document");
     let cleaned: String = stem
         .chars()
-        .map(|c| if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
         .take(80)
         .collect();
     let cleaned = cleaned.trim_matches(['_', '.']);
-    let stem = if cleaned.is_empty() { "document" } else { cleaned };
+    let stem = if cleaned.is_empty() {
+        "document"
+    } else {
+        cleaned
+    };
     format!("{stem}.{extension}")
 }
 
@@ -131,7 +143,9 @@ async fn upload(
     };
     write.await.map_err(|e| {
         tracing::error!(error = %e, path = %full.display(), "не удалось сохранить файл");
-        AppError::Conflict("Не удалось сохранить файл на сервере — проверьте папку FILES_DIR".into())
+        AppError::Conflict(
+            "Не удалось сохранить файл на сервере — проверьте папку FILES_DIR".into(),
+        )
     })?;
 
     let mut tx = db.begin().await?;
@@ -149,7 +163,14 @@ async fn upload(
     .bind(&user.login)
     .fetch_one(&mut *tx)
     .await?;
-    audit::record(&mut *tx, "delivery", delivery_id, "attach", json!({ "file": name, "size": body.len() })).await?;
+    audit::record(
+        &mut *tx,
+        "delivery",
+        delivery_id,
+        "attach",
+        json!({ "file": name, "size": body.len() }),
+    )
+    .await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(row)))
 }
@@ -164,13 +185,20 @@ async fn download(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<impl 
     .ok_or_else(|| AppError::NotFound("Файл не найден".into()))?;
     let bytes = tokio::fs::read(files_dir().join(&path))
         .await
-        .map_err(|_| AppError::NotFound(format!("Файл «{name}» есть в учёте, но не найден в папке хранения")))?;
+        .map_err(|_| {
+            AppError::NotFound(format!(
+                "Файл «{name}» есть в учёте, но не найден в папке хранения"
+            ))
+        })?;
     Ok((
         [
             (header::CONTENT_TYPE, content_type),
             (
                 header::CONTENT_DISPOSITION,
-                format!("inline; filename=\"document\"; filename*=UTF-8''{}", percent_encode(&name)),
+                format!(
+                    "inline; filename=\"document\"; filename*=UTF-8''{}",
+                    percent_encode(&name)
+                ),
             ),
         ],
         bytes,
@@ -183,8 +211,14 @@ mod tests {
 
     #[test]
     fn detects_only_allowed_types() {
-        assert_eq!(detect_type(b"\xFF\xD8\xFF\xE0rest").unwrap().0, "image/jpeg");
-        assert_eq!(detect_type(b"\x89PNG\r\n\x1a\nrest").unwrap().0, "image/png");
+        assert_eq!(
+            detect_type(b"\xFF\xD8\xFF\xE0rest").unwrap().0,
+            "image/jpeg"
+        );
+        assert_eq!(
+            detect_type(b"\x89PNG\r\n\x1a\nrest").unwrap().0,
+            "image/png"
+        );
         assert_eq!(detect_type(b"%PDF-1.7").unwrap().0, "application/pdf");
         assert!(detect_type(b"MZ\x90\x00").is_none());
         assert!(detect_type(b"<html>").is_none());
@@ -192,7 +226,10 @@ mod tests {
 
     #[test]
     fn names_are_safe_for_network_folder() {
-        assert_eq!(safe_name("ТН №15 от 01.11.pdf", "pdf"), "ТН__15_от_01.11.pdf");
+        assert_eq!(
+            safe_name("ТН №15 от 01.11.pdf", "pdf"),
+            "ТН__15_от_01.11.pdf"
+        );
         assert_eq!(safe_name("../../etc/passwd", "pdf"), "passwd.pdf");
         assert_eq!(safe_name("скан.exe", "jpg"), "скан.jpg");
         assert_eq!(safe_name("???", "png"), "document.png");

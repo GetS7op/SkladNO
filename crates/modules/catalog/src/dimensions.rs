@@ -27,8 +27,18 @@ mod tests {
 
     #[test]
     fn formats_any_separators() {
-        for raw in ["400 195 290", "400x195x290", "400 х 195 Х 290", "400*195*290", " 400,195;290 "] {
-            assert_eq!(format_dimensions(Some(raw)), Ok(Some("400x195x290".into())), "{raw}");
+        for raw in [
+            "400 195 290",
+            "400x195x290",
+            "400 х 195 Х 290",
+            "400*195*290",
+            " 400,195;290 ",
+        ] {
+            assert_eq!(
+                format_dimensions(Some(raw)),
+                Ok(Some("400x195x290".into())),
+                "{raw}"
+            );
         }
     }
 

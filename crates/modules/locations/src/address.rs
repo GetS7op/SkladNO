@@ -16,7 +16,11 @@ impl Address {
     /// (сканер в русской раскладке вводит «Х», а наклейки, напечатанные до смены настройки,
     /// продолжают читаться), а также текущий разделитель.
     pub fn parse(code: &str, separator: &str) -> Result<Address, String> {
-        let normalized = if separator.is_empty() { code.to_string() } else { code.replace(separator, "X") };
+        let normalized = if separator.is_empty() {
+            code.to_string()
+        } else {
+            code.replace(separator, "X")
+        };
         let parts: Vec<&str> = normalized.trim().split(['X', 'x', 'Х', 'х']).collect();
         let numbers = parts
             .iter()
@@ -41,7 +45,11 @@ impl Address {
 impl std::fmt::Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = &self.separator;
-        write!(f, "{}{s}{}{s}{}{s}{}", self.module, self.container, self.rack, self.shelf)
+        write!(
+            f,
+            "{}{s}{}{s}{}{s}{}",
+            self.module, self.container, self.rack, self.shelf
+        )
     }
 }
 
@@ -53,9 +61,16 @@ mod tests {
     fn parses_any_x() {
         for code in ["1X12X3X4", "1x12x3x4", " 1Х12х3Х4 "] {
             let a = Address::parse(code, "X").unwrap();
-            assert_eq!((a.module, a.container, a.rack, a.shelf), (1, 12, 3, 4), "{code}");
+            assert_eq!(
+                (a.module, a.container, a.rack, a.shelf),
+                (1, 12, 3, 4),
+                "{code}"
+            );
         }
-        assert_eq!(Address::parse("1X12X3X4", "X").unwrap().to_string(), "1X12X3X4");
+        assert_eq!(
+            Address::parse("1X12X3X4", "X").unwrap().to_string(),
+            "1X12X3X4"
+        );
     }
 
     #[test]
@@ -63,8 +78,14 @@ mod tests {
         let a = Address::parse("1-12-3-4", "-").unwrap();
         assert_eq!(a.to_string(), "1-12-3-4");
         // Наклейка, напечатанная до смены разделителя, читается и выводится по-новому.
-        assert_eq!(Address::parse("1X12X3X4", "-").unwrap().to_string(), "1-12-3-4");
-        assert_eq!(Address::parse("1.2.3.4", ".").unwrap().to_string(), "1.2.3.4");
+        assert_eq!(
+            Address::parse("1X12X3X4", "-").unwrap().to_string(),
+            "1-12-3-4"
+        );
+        assert_eq!(
+            Address::parse("1.2.3.4", ".").unwrap().to_string(),
+            "1.2.3.4"
+        );
     }
 
     #[test]

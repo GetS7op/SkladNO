@@ -15,9 +15,10 @@ use skladno_core::{AppError, AppResult, Db, audit, auth};
 use uuid::Uuid;
 
 use crate::{
-    create_session,
+    create_session, is_https,
     profile::{self, ME_COLUMNS, Me, ProfileInput},
-    is_https, secrets, session_cookie, session_token,
+    secrets, session_cookie, session_token,
+    throttle::LOGIN_THROTTLE,
 };
 
 /// Пауза после неудачного входа: перебор паролей становится медленным.
@@ -82,7 +83,14 @@ async fn insert_user(
     .fetch_one(&mut **tx)
     .await
     .map_err(AppError::unique_as(format!("Логин «{}» уже занят", p.login)))?;
-    audit::record(&mut **tx, "user", id, "create", json!({ "profile": p, "role": role })).await?;
+    audit::record(
+        &mut **tx,
+        "user",
+        id,
+        "create",
+        json!({ "profile": p, "role": role }),
+    )
+    .await?;
     Ok(id)
 }
 
@@ -93,18 +101,27 @@ async fn setup(
     Json(input): Json<ProfileInput>,
 ) -> AppResult<impl IntoResponse> {
     let mut tx = db.begin().await?;
-    sqlx::query("SELECT pg_advisory_xact_lock($1)").bind(SETUP_LOCK).execute(&mut *tx).await?;
+    sqlx::query("SELECT pg_advisory_xact_lock($1)")
+        .bind(SETUP_LOCK)
+        .execute(&mut *tx)
+        .await?;
     let exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM users)")
         .fetch_one(&mut *tx)
         .await?;
     if exists {
-        return Err(AppError::Conflict("Администратор уже создан — войдите".into()));
+        return Err(AppError::Conflict(
+            "Администратор уже создан — войдите".into(),
+        ));
     }
     let id = insert_user(&mut tx, &input, "admin").await?;
     let cookie = create_session(&mut *tx, id, &headers).await?;
     let me = fetch_me(&mut *tx, id).await?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, [(header::SET_COOKIE, cookie)], Json(me)))
+    Ok((
+        StatusCode::CREATED,
+        [(header::SET_COOKIE, cookie)],
+        Json(me),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -125,23 +142,38 @@ async fn login(
     headers: HeaderMap,
     Json(input): Json<LoginInput>,
 ) -> AppResult<impl IntoResponse> {
+    let now = std::time::Instant::now();
+    if let Some(wait) = LOGIN_THROTTLE.blocked_for(&input.login, now) {
+        return Err(AppError::TooManyRequests(format!(
+            "Слишком много неудачных попыток входа. Повторите через {} мин. или попросите администратора сбросить пароль",
+            wait.as_secs().div_ceil(60)
+        )));
+    }
     let found = sqlx::query_as::<_, Credentials>(
         "SELECT id, password_hash, active FROM users WHERE lower(login) = lower($1)",
     )
     .bind(input.login.trim())
     .fetch_optional(&db)
     .await?;
-    let hash = found.as_ref().map_or_else(secrets::dummy_hash, |c| c.password_hash.clone());
+    let hash = found
+        .as_ref()
+        .map_or_else(secrets::dummy_hash, |c| c.password_hash.clone());
     let password_ok = secrets::verify_password(&input.password, &hash);
     let Some(user) = found.filter(|_| password_ok) else {
+        LOGIN_THROTTLE.record_failure(&input.login, now);
         tokio::time::sleep(FAILED_LOGIN_DELAY).await;
         return Err(AppError::Validation("Неверный логин или пароль".into()));
     };
     if !user.active {
-        return Err(AppError::Forbidden("Учётная запись отключена администратором".into()));
+        return Err(AppError::Forbidden(
+            "Учётная запись отключена администратором".into(),
+        ));
     }
+    LOGIN_THROTTLE.reset(&input.login);
     let mut tx = db.begin().await?;
-    sqlx::query("DELETE FROM sessions WHERE expires_at <= now()").execute(&mut *tx).await?;
+    sqlx::query("DELETE FROM sessions WHERE expires_at <= now()")
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE users SET last_login_at = now() WHERE id = $1")
         .bind(user.id)
         .execute(&mut *tx)
@@ -159,7 +191,13 @@ async fn logout(State(db): State<Db>, headers: HeaderMap) -> AppResult<impl Into
             .execute(&db)
             .await?;
     }
-    Ok(([(header::SET_COOKIE, session_cookie("", 0, is_https(&headers)))], StatusCode::NO_CONTENT))
+    Ok((
+        [(
+            header::SET_COOKIE,
+            session_cookie("", 0, is_https(&headers)),
+        )],
+        StatusCode::NO_CONTENT,
+    ))
 }
 
 #[derive(Serialize, sqlx::FromRow)]
@@ -175,13 +213,18 @@ fn invalid_invite() -> AppError {
     AppError::NotFound("Приглашение недействительно: истекло, отозвано или уже использовано".into())
 }
 
-async fn invite_info(State(db): State<Db>, Path(token): Path<String>) -> AppResult<Json<InviteInfo>> {
-    sqlx::query_as::<_, InviteInfo>(&format!("SELECT role, expires_at FROM invites WHERE {VALID_INVITE}"))
-        .bind(secrets::token_hash(&token))
-        .fetch_optional(&db)
-        .await?
-        .map(Json)
-        .ok_or_else(invalid_invite)
+async fn invite_info(
+    State(db): State<Db>,
+    Path(token): Path<String>,
+) -> AppResult<Json<InviteInfo>> {
+    sqlx::query_as::<_, InviteInfo>(&format!(
+        "SELECT role, expires_at FROM invites WHERE {VALID_INVITE}"
+    ))
+    .bind(secrets::token_hash(&token))
+    .fetch_optional(&db)
+    .await?
+    .map(Json)
+    .ok_or_else(invalid_invite)
 }
 
 #[derive(Deserialize)]
@@ -213,7 +256,11 @@ async fn register(
     let cookie = create_session(&mut *tx, id, &headers).await?;
     let me = fetch_me(&mut *tx, id).await?;
     tx.commit().await?;
-    Ok((StatusCode::CREATED, [(header::SET_COOKIE, cookie)], Json(me)))
+    Ok((
+        StatusCode::CREATED,
+        [(header::SET_COOKIE, cookie)],
+        Json(me),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -238,7 +285,9 @@ async fn change_password(
         tokio::time::sleep(FAILED_LOGIN_DELAY).await;
         return Err(AppError::Validation("Текущий пароль указан неверно".into()));
     }
-    let current_session = session_token(&headers).map(secrets::token_hash).unwrap_or_default();
+    let current_session = session_token(&headers)
+        .map(secrets::token_hash)
+        .unwrap_or_default();
     let mut tx = db.begin().await?;
     sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
         .bind(user.id)

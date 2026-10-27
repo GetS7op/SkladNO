@@ -86,7 +86,10 @@ fn duplicate(name: &str) -> String {
     format!("Клиент «{name}» уже есть в справочнике")
 }
 
-async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult<Json<Vec<Client>>> {
+async fn list(
+    State(db): State<Db>,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<Vec<Client>>> {
     let rows = sqlx::query_as::<_, Client>(&format!(
         "{SELECT} WHERE ($1::text IS NULL OR c.name ILIKE $1 OR c.note ILIKE $1) ORDER BY lower(c.name)"
     ))
@@ -110,12 +113,14 @@ async fn create(
 ) -> AppResult<(StatusCode, Json<Client>)> {
     let fields = validate(input)?;
     let mut tx = db.begin().await?;
-    let id = sqlx::query_scalar::<_, Uuid>("INSERT INTO clients (name, note) VALUES ($1, $2) RETURNING id")
-        .bind(&fields.name)
-        .bind(&fields.note)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(AppError::unique_as(duplicate(&fields.name)))?;
+    let id = sqlx::query_scalar::<_, Uuid>(
+        "INSERT INTO clients (name, note) VALUES ($1, $2) RETURNING id",
+    )
+    .bind(&fields.name)
+    .bind(&fields.note)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(AppError::unique_as(duplicate(&fields.name)))?;
     audit::record(&mut *tx, "client", id, "create", json!(fields)).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(fetch(&db, id).await?)))
@@ -128,11 +133,13 @@ async fn update(
 ) -> AppResult<Json<Client>> {
     let fields = validate(input)?;
     let mut tx = db.begin().await?;
-    let before = sqlx::query_as::<_, ClientFields>("SELECT name, note FROM clients WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Клиент не найден".into()))?;
+    let before = sqlx::query_as::<_, ClientFields>(
+        "SELECT name, note FROM clients WHERE id = $1 FOR UPDATE",
+    )
+    .bind(id)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Клиент не найден".into()))?;
     sqlx::query("UPDATE clients SET name = $2, note = $3, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(&fields.name)
@@ -140,7 +147,14 @@ async fn update(
         .execute(&mut *tx)
         .await
         .map_err(AppError::unique_as(duplicate(&fields.name)))?;
-    audit::record(&mut *tx, "client", id, "update", audit::diff(&before, &fields)).await?;
+    audit::record(
+        &mut *tx,
+        "client",
+        id,
+        "update",
+        audit::diff(&before, &fields),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(fetch(&db, id).await?))
 }
@@ -158,7 +172,10 @@ struct ExportRow {
 }
 
 /// Результат F-02: выгрузка устройств клиента в CSV (разделитель «;», BOM — для Excel).
-async fn export_devices(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<impl IntoResponse> {
+async fn export_devices(
+    State(db): State<Db>,
+    Path(id): Path<Uuid>,
+) -> AppResult<impl IntoResponse> {
     let client = fetch(&db, id).await?;
     let rows = sqlx::query_as::<_, ExportRow>(
         "SELECT v.device_index, v.id, m.manufacturer, m.model, d.number, d.delivery_date, d.destination, d.stage \
@@ -169,7 +186,9 @@ async fn export_devices(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult
     .fetch_all(&db)
     .await?;
 
-    let mut csv = String::from("\u{feff}Index;UUID;Производитель;Модель;Поставка;Дата поставки;Назначение;Этап\r\n");
+    let mut csv = String::from(
+        "\u{feff}Index;UUID;Производитель;Модель;Поставка;Дата поставки;Назначение;Этап\r\n",
+    );
     for r in rows {
         let fields = [
             r.device_index,
@@ -188,7 +207,10 @@ async fn export_devices(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult
     Ok((
         [
             (header::CONTENT_TYPE, "text/csv; charset=utf-8".to_string()),
-            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
         ],
         csv,
     ))

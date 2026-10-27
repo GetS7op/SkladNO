@@ -77,7 +77,10 @@ pub struct InventoryPage {
     limit: i64,
 }
 
-async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult<Json<InventoryPage>> {
+async fn list(
+    State(db): State<Db>,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<InventoryPage>> {
     let limit = query.limit.unwrap_or(100).clamp(1, PAGE_MAX);
     let offset = query.offset.max(0);
     let pattern = text::like_pattern(query.q.as_deref());
@@ -104,7 +107,12 @@ async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult
     .bind(offset)
     .fetch_all(&db)
     .await?;
-    Ok(Json(InventoryPage { items, total, offset, limit }))
+    Ok(Json(InventoryPage {
+        items,
+        total,
+        offset,
+        limit,
+    }))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -123,7 +131,10 @@ pub struct DeviceCard {
     history: Vec<HistoryEntry>,
 }
 
-async fn fetch_item<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> AppResult<InventoryItem> {
+async fn fetch_item<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> AppResult<InventoryItem> {
     sqlx::query_as::<_, InventoryItem>(&format!("{SELECT} WHERE v.id = $1"))
         .bind(id)
         .fetch_optional(executor)
@@ -133,17 +144,22 @@ async fn fetch_item<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> AppRe
 
 async fn detail(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<DeviceCard>> {
     let item = fetch_item(&db, id).await?;
-    let created_at = sqlx::query_scalar::<_, DateTime<Utc>>("SELECT created_at FROM devices WHERE id = $1")
-        .bind(id)
-        .fetch_one(&db)
-        .await?;
+    let created_at =
+        sqlx::query_scalar::<_, DateTime<Utc>>("SELECT created_at FROM devices WHERE id = $1")
+            .bind(id)
+            .fetch_one(&db)
+            .await?;
     let history = sqlx::query_as::<_, HistoryEntry>(
         "SELECT at, actor, action, changes FROM audit_log WHERE entity = 'device' AND entity_id = $1 ORDER BY at DESC, id DESC",
     )
     .bind(id)
     .fetch_all(&db)
     .await?;
-    Ok(Json(DeviceCard { item, created_at, history }))
+    Ok(Json(DeviceCard {
+        item,
+        created_at,
+        history,
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -164,7 +180,9 @@ async fn update(
     };
     let serial = text::clean(input.serial_no);
     if serial.as_deref().is_some_and(|s| s.chars().count() > 100) {
-        return Err(AppError::Validation("Серийный номер длиннее 100 символов".into()));
+        return Err(AppError::Validation(
+            "Серийный номер длиннее 100 символов".into(),
+        ));
     }
 
     let mut tx = db.begin().await?;
@@ -177,7 +195,10 @@ async fn update(
     .await?
     .ok_or_else(|| AppError::NotFound("Устройство не найдено".into()))?;
     if stage == "closed" {
-        auth::require(Role::Senior, "Изменение данных устройства закрытой поставки")?;
+        auth::require(
+            Role::Senior,
+            "Изменение данных устройства закрытой поставки",
+        )?;
     }
     if let Some(mac) = &mac {
         let owner = sqlx::query_scalar::<_, String>(
@@ -188,7 +209,9 @@ async fn update(
         .fetch_optional(&mut *tx)
         .await?;
         if let Some(owner) = owner {
-            return Err(AppError::Conflict(format!("MAC {mac} уже записан у устройства {owner}")));
+            return Err(AppError::Conflict(format!(
+                "MAC {mac} уже записан у устройства {owner}"
+            )));
         }
     }
     if mac != old_mac || serial != old_serial {

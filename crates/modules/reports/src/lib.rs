@@ -53,7 +53,10 @@ async fn export(
     let format = ExportFormat::parse(&query.format)
         .ok_or_else(|| AppError::Validation("Формат выгрузки: csv, xlsx или md".into()))?;
     let table = registries::build(&db, &name).await?.ok_or_else(|| {
-        AppError::NotFound(format!("Нет реестра «{name}». Доступны: {}", registries::NAMES.join(", ")))
+        AppError::NotFound(format!(
+            "Нет реестра «{name}». Доступны: {}",
+            registries::NAMES.join(", ")
+        ))
     })?;
     let now = Local::now();
     let generated = now.format("%d.%m.%Y %H:%M").to_string();
@@ -63,11 +66,19 @@ async fn export(
         ExportFormat::Xlsx => table::to_xlsx(&table, &generated)
             .map_err(|e| AppError::Validation(format!("Не удалось собрать XLSX: {e}")))?,
     };
-    let filename = format!("skladno-{}-{}.{}", table.file, now.format("%Y-%m-%d"), format.extension());
+    let filename = format!(
+        "skladno-{}-{}.{}",
+        table.file,
+        now.format("%Y-%m-%d"),
+        format.extension()
+    );
     Ok((
         [
             (header::CONTENT_TYPE, format.content_type().to_string()),
-            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
         ],
         body,
     ))

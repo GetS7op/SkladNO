@@ -44,7 +44,9 @@ pub const ME_COLUMNS: &str = "id, login, last_name, first_name, middle_name, ema
 fn name(value: &str, label: &str) -> AppResult<String> {
     let value = value.trim();
     if value.is_empty() || value.chars().count() > 60 {
-        return Err(AppError::Validation(format!("{label}: от 1 до 60 символов")));
+        return Err(AppError::Validation(format!(
+            "{label}: от 1 до 60 символов"
+        )));
     }
     Ok(value.to_string())
 }
@@ -62,21 +64,39 @@ pub fn validate_password(password: &str) -> AppResult<()> {
 pub fn validate(input: &ProfileInput) -> AppResult<Profile> {
     let login = input.login.trim();
     if !(3..=40).contains(&login.len())
-        || !login.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
+        || !login
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-'))
     {
         return Err(AppError::Validation(
             "Логин: 3–40 латинских букв, цифр или символов _ . -".into(),
         ));
     }
     let email = input.email.trim();
-    if email.len() > 254 || email.contains(char::is_whitespace) || !email.contains('@') || email.starts_with('@') || email.ends_with('@') {
-        return Err(AppError::Validation("Укажите почту вида name@example.ru".into()));
+    if email.len() > 254
+        || email.contains(char::is_whitespace)
+        || !email.contains('@')
+        || email.starts_with('@')
+        || email.ends_with('@')
+    {
+        return Err(AppError::Validation(
+            "Укажите почту вида name@example.ru".into(),
+        ));
     }
-    let telegram = match input.telegram.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
+    let telegram = match input
+        .telegram
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
         None => None,
         Some(t) => {
             let username = t.trim_start_matches('@');
-            if !(5..=32).contains(&username.len()) || !username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            if !(5..=32).contains(&username.len())
+                || !username
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+            {
                 return Err(AppError::Validation(
                     "Telegram: 5–32 латинских буквы, цифры или _".into(),
                 ));

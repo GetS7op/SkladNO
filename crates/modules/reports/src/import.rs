@@ -49,7 +49,11 @@ pub(crate) fn read_rows(bytes: &[u8]) -> AppResult<Vec<Vec<String>>> {
     };
     Ok(rows
         .into_iter()
-        .map(|r| r.into_iter().map(|c| c.trim().to_string()).collect::<Vec<_>>())
+        .map(|r| {
+            r.into_iter()
+                .map(|c| c.trim().to_string())
+                .collect::<Vec<_>>()
+        })
         .collect())
 }
 
@@ -67,7 +71,9 @@ fn read_xlsx(bytes: &[u8]) -> AppResult<Vec<Vec<String>>> {
                 .map(|cell| match cell {
                     Data::Empty => String::new(),
                     Data::String(s) => s.clone(),
-                    Data::Float(f) if f.fract() == 0.0 && f.abs() < 1e15 => format!("{}", *f as i64),
+                    Data::Float(f) if f.fract() == 0.0 && f.abs() < 1e15 => {
+                        format!("{}", *f as i64)
+                    }
                     Data::Float(f) => f.to_string(),
                     Data::Int(i) => i.to_string(),
                     Data::Bool(b) => if *b { "да" } else { "нет" }.to_string(),
@@ -123,7 +129,10 @@ fn read_csv(text: &str) -> Vec<Vec<String>> {
 }
 
 /// Колонки по шапке: «Потребление, Вт» → «потребление». Возвращает индекс колонки по ключу.
-pub(crate) fn header_index(header: &[String], aliases: &[(&'static str, &[&str])]) -> HashMap<&'static str, usize> {
+pub(crate) fn header_index(
+    header: &[String],
+    aliases: &[(&'static str, &[&str])],
+) -> HashMap<&'static str, usize> {
     let mut found = HashMap::new();
     for (i, title) in header.iter().enumerate() {
         let base = title.split(',').next().unwrap_or("").trim().to_lowercase();
@@ -169,7 +178,11 @@ pub async fn import(
     let (columns, required): (&[(&'static str, &[&str])], &[&str]) = match name.as_str() {
         "devices" => (MODEL_COLUMNS, &["manufacturer", "model"]),
         "clients" => (CLIENT_COLUMNS, &["name"]),
-        _ => return Err(AppError::NotFound("Импорт есть для реестров devices и clients".into())),
+        _ => {
+            return Err(AppError::NotFound(
+                "Импорт есть для реестров devices и clients".into(),
+            ));
+        }
     };
     if body.is_empty() {
         return Err(AppError::Validation("Файл пустой".into()));
@@ -197,13 +210,27 @@ pub async fn import(
         .map(|(i, r)| (i + 1, r))
         .collect();
     if data.len() > MAX_ROWS {
-        return Err(AppError::Validation(format!("Не больше {MAX_ROWS} строк за один импорт")));
+        return Err(AppError::Validation(format!(
+            "Не больше {MAX_ROWS} строк за один импорт"
+        )));
     }
 
-    let mut report = ImportReport { dry_run: query.dry_run, total: data.len(), created: 0, skipped: 0, errors: Vec::new() };
+    let mut report = ImportReport {
+        dry_run: query.dry_run,
+        total: data.len(),
+        created: 0,
+        skipped: 0,
+        errors: Vec::new(),
+    };
     let mut tx = db.begin().await?;
     for (line, row) in data {
-        let cell = |key: &str| index.get(key).and_then(|i| row.get(*i)).cloned().unwrap_or_default();
+        let cell = |key: &str| {
+            index
+                .get(key)
+                .and_then(|i| row.get(*i))
+                .cloned()
+                .unwrap_or_default()
+        };
         // Каждая строка — в своей точке сохранения: ошибка одной строки не отменяет остальные.
         let mut savepoint = (&mut *tx).begin().await?;
         let outcome = match name.as_str() {
@@ -229,19 +256,29 @@ pub async fn import(
             }
             _ => {
                 let note = cell("note");
-                let input = ClientInput { name: cell("name"), note: (!note.is_empty()).then_some(note) };
+                let input = ClientInput {
+                    name: cell("name"),
+                    note: (!note.is_empty()).then_some(note),
+                };
                 skladno_clients::import_one(&mut savepoint, input).await
             }
         };
         match outcome {
             Ok(created) => {
                 savepoint.commit().await?;
-                if created { report.created += 1 } else { report.skipped += 1 }
+                if created {
+                    report.created += 1
+                } else {
+                    report.skipped += 1
+                }
             }
             Err(AppError::Db(e)) => return Err(AppError::Db(e)),
             Err(e) => {
                 savepoint.rollback().await?;
-                report.errors.push(RowError { row: line, message: e.to_string() });
+                report.errors.push(RowError {
+                    row: line,
+                    message: e.to_string(),
+                });
             }
         }
     }
@@ -259,21 +296,25 @@ mod tests {
 
     #[test]
     fn csv_with_quotes_and_semicolons() {
-        let rows = read_csv("Производитель;Модель\r\n\"Bit;main\";\"S21 \"\"Pro\"\"\"\r\nMicroBT;M60\n");
+        let rows =
+            read_csv("Производитель;Модель\r\n\"Bit;main\";\"S21 \"\"Pro\"\"\"\r\nMicroBT;M60\n");
         assert_eq!(rows[1], vec!["Bit;main", "S21 \"Pro\""]);
         assert_eq!(rows[2], vec!["MicroBT", "M60"]);
     }
 
     #[test]
     fn detects_comma_delimiter_and_cp1251() {
-        let (bytes, _, _) = encoding_rs::WINDOWS_1251.encode("Наименование,Заметка\nООО Ромашка,тест\n");
+        let (bytes, _, _) =
+            encoding_rs::WINDOWS_1251.encode("Наименование,Заметка\nООО Ромашка,тест\n");
         let rows = read_csv(&decode_text(&bytes));
         assert_eq!(rows[1], vec!["ООО Ромашка", "тест"]);
     }
 
     #[test]
     fn headers_match_export_titles() {
-        let header: Vec<String> = ["Модель", "Производитель", "XP, Th/s", "Потребление, Вт"].map(String::from).to_vec();
+        let header: Vec<String> = ["Модель", "Производитель", "XP, Th/s", "Потребление, Вт"]
+            .map(String::from)
+            .to_vec();
         let index = header_index(&header, MODEL_COLUMNS);
         assert_eq!(index["model"], 0);
         assert_eq!(index["manufacturer"], 1);

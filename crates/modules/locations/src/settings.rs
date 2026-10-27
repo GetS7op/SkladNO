@@ -32,7 +32,10 @@ struct SettingsInput {
     address_separator: String,
 }
 
-async fn update_settings(State(db): State<Db>, Json(input): Json<SettingsInput>) -> AppResult<Json<Settings>> {
+async fn update_settings(
+    State(db): State<Db>,
+    Json(input): Json<SettingsInput>,
+) -> AppResult<Json<Settings>> {
     auth::require(Role::Admin, "Изменение настроек")?;
     let separator = input.address_separator.trim().to_string();
     if !ALLOWED_SEPARATORS.contains(&separator.as_str()) {

@@ -19,6 +19,8 @@ pub enum AppError {
     Unauthorized,
     #[error("{0}")]
     Forbidden(String),
+    #[error("{0}")]
+    TooManyRequests(String),
     #[error("database error: {0}")]
     Db(#[from] sqlx::Error),
 }
@@ -47,6 +49,11 @@ impl IntoResponse for AppError {
             AppError::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.clone()),
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized", self.to_string()),
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.clone()),
+            AppError::TooManyRequests(m) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "too_many_requests",
+                m.clone(),
+            ),
             AppError::Db(e) => {
                 tracing::error!(error = %e, "database error");
                 (

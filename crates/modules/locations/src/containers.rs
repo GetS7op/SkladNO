@@ -70,10 +70,14 @@ fn validate(input: ContainerInput) -> AppResult<ContainerFields> {
     let name = input.name.trim().to_string();
     let short_name = input.short_name.trim().to_string();
     if name.is_empty() || short_name.is_empty() {
-        return Err(AppError::Validation("Укажите наименование и сокращение".into()));
+        return Err(AppError::Validation(
+            "Укажите наименование и сокращение".into(),
+        ));
     }
     if !input.power_kw.is_finite() || input.power_kw <= 0.0 {
-        return Err(AppError::Validation("Мощность контейнера — число больше нуля, кВт".into()));
+        return Err(AppError::Validation(
+            "Мощность контейнера — число больше нуля, кВт".into(),
+        ));
     }
     for (value, label) in [
         (input.racks, "Кол-во стеллажей"),
@@ -100,7 +104,10 @@ fn validate(input: ContainerInput) -> AppResult<ContainerFields> {
 
 const DUPLICATE: &str = "Контейнер с таким наименованием или сокращением уже есть";
 
-async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult<Json<Vec<Container>>> {
+async fn list(
+    State(db): State<Db>,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<Vec<Container>>> {
     let rows = sqlx::query_as::<_, Container>(&format!(
         "SELECT {COLUMNS} FROM containers c WHERE ($1::text IS NULL OR c.name ILIKE $1 OR c.short_name ILIKE $1) \
          ORDER BY lower(c.name)"
@@ -112,11 +119,13 @@ async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult
 }
 
 async fn fetch(db: &Db, id: Uuid) -> AppResult<Container> {
-    sqlx::query_as::<_, Container>(&format!("SELECT {COLUMNS} FROM containers c WHERE c.id = $1"))
-        .bind(id)
-        .fetch_optional(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Контейнер не найден".into()))
+    sqlx::query_as::<_, Container>(&format!(
+        "SELECT {COLUMNS} FROM containers c WHERE c.id = $1"
+    ))
+    .bind(id)
+    .fetch_optional(db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Контейнер не найден".into()))
 }
 
 async fn create(
@@ -180,7 +189,14 @@ async fn update(
     .execute(&mut *tx)
     .await
     .map_err(AppError::unique_as(DUPLICATE))?;
-    audit::record(&mut *tx, "container", id, "update", audit::diff(&before, &f)).await?;
+    audit::record(
+        &mut *tx,
+        "container",
+        id,
+        "update",
+        audit::diff(&before, &f),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(fetch(&db, id).await?))
 }
@@ -222,7 +238,10 @@ async fn check_occupancy(
     .await?;
     if !crowded.is_empty() {
         return Err(conflict(
-            &format!("На некоторых полках больше {} устройств", f.devices_per_shelf),
+            &format!(
+                "На некоторых полках больше {} устройств",
+                f.devices_per_shelf
+            ),
             &crowded,
         ));
     }
@@ -249,7 +268,11 @@ async fn check_occupancy(
 fn conflict(reason: &str, indexes: &[String]) -> AppError {
     let shown: Vec<&str> = indexes.iter().take(10).map(String::as_str).collect();
     let more = indexes.len().saturating_sub(shown.len());
-    let tail = if more > 0 { format!(" и ещё {more}") } else { String::new() };
+    let tail = if more > 0 {
+        format!(" и ещё {more}")
+    } else {
+        String::new()
+    };
     AppError::Conflict(format!(
         "{reason}. Затронуто устройств: {} (Index: {}{tail}). Сначала переместите их.",
         indexes.len(),

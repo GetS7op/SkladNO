@@ -92,7 +92,9 @@ impl ExportFormat {
     pub fn content_type(self) -> &'static str {
         match self {
             ExportFormat::Csv => "text/csv; charset=utf-8",
-            ExportFormat::Xlsx => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ExportFormat::Xlsx => {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
             ExportFormat::Md => "text/markdown; charset=utf-8",
         }
     }
@@ -108,10 +110,22 @@ pub fn to_csv(table: &Table) -> Vec<u8> {
         }
     };
     let mut out = String::from("\u{feff}");
-    out.push_str(&table.columns.iter().map(|c| field((*c).to_string())).collect::<Vec<_>>().join(";"));
+    out.push_str(
+        &table
+            .columns
+            .iter()
+            .map(|c| field((*c).to_string()))
+            .collect::<Vec<_>>()
+            .join(";"),
+    );
     out.push_str("\r\n");
     for row in &table.rows {
-        out.push_str(&row.iter().map(|c| field(c.as_text())).collect::<Vec<_>>().join(";"));
+        out.push_str(
+            &row.iter()
+                .map(|c| field(c.as_text()))
+                .collect::<Vec<_>>()
+                .join(";"),
+        );
         out.push_str("\r\n");
     }
     out.into_bytes()
@@ -120,9 +134,16 @@ pub fn to_csv(table: &Table) -> Vec<u8> {
 /// Markdown-отчёт: заголовок, дата, статистика, затем данные.
 pub fn to_md(table: &Table, generated: &str) -> Vec<u8> {
     let esc = |v: String| v.replace('|', "\\|").replace(['\n', '\r'], " ");
-    let mut out = format!("# {}\n\nСформировано: {generated}\n\n## Статистика\n\n| Показатель | Значение |\n|---|---|\n", table.title);
+    let mut out = format!(
+        "# {}\n\nСформировано: {generated}\n\n## Статистика\n\n| Показатель | Значение |\n|---|---|\n",
+        table.title
+    );
     for (name, value) in &table.stats {
-        out.push_str(&format!("| {} | {} |\n", esc(name.clone()), esc(value.as_text())));
+        out.push_str(&format!(
+            "| {} | {} |\n",
+            esc(name.clone()),
+            esc(value.as_text())
+        ));
     }
     out.push_str(&format!("\n## Данные ({} строк)\n\n", table.rows.len()));
     out.push_str(&format!("| {} |\n", table.columns.join(" | ")));
@@ -130,7 +151,10 @@ pub fn to_md(table: &Table, generated: &str) -> Vec<u8> {
     for row in &table.rows {
         out.push_str(&format!(
             "| {} |\n",
-            row.iter().map(|c| esc(c.as_text())).collect::<Vec<_>>().join(" | ")
+            row.iter()
+                .map(|c| esc(c.as_text()))
+                .collect::<Vec<_>>()
+                .join(" | ")
         ));
     }
     out.into_bytes()
@@ -161,7 +185,12 @@ pub fn to_xlsx(table: &Table, generated: &str) -> Result<Vec<u8>, XlsxError> {
     }
     data.set_freeze_panes(1, 0)?;
     if !table.columns.is_empty() {
-        data.autofilter(0, 0, table.rows.len() as u32, (table.columns.len() - 1) as u16)?;
+        data.autofilter(
+            0,
+            0,
+            table.rows.len() as u32,
+            (table.columns.len() - 1) as u16,
+        )?;
     }
     data.autofit();
 

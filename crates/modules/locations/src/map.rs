@@ -98,8 +98,16 @@ struct Target {
 
 /// Находит полку по адресу и проверяет, что стеллаж и полка есть в шаблоне контейнера.
 /// В транзакции приёма экземпляр контейнера блокируется: размещения в него идут по одному.
-async fn resolve<'e, E: sqlx::PgExecutor<'e>>(executor: E, address: &Address, lock: bool) -> AppResult<Target> {
-    let lock_clause = if lock { " FOR UPDATE OF mc FOR SHARE OF c, m" } else { "" };
+async fn resolve<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    address: &Address,
+    lock: bool,
+) -> AppResult<Target> {
+    let lock_clause = if lock {
+        " FOR UPDATE OF mc FOR SHARE OF c, m"
+    } else {
+        ""
+    };
     let target = sqlx::query_as::<_, Target>(&format!(
         "SELECT mc.id AS module_container_id, m.warehouse, c.racks, c.shelves_per_rack, c.devices_per_shelf, c.power_kw \
          FROM modules m JOIN module_containers mc ON mc.module_id = m.id AND mc.number = $2 \
@@ -145,7 +153,10 @@ struct ShelfResponse {
     devices: Vec<ShelfDevice>,
 }
 
-async fn shelf(State(db): State<Db>, Query(query): Query<ShelfQuery>) -> AppResult<Json<ShelfResponse>> {
+async fn shelf(
+    State(db): State<Db>,
+    Query(query): Query<ShelfQuery>,
+) -> AppResult<Json<ShelfResponse>> {
     let separator = address_separator(&db).await?;
     let address = Address::parse(&query.code, &separator).map_err(AppError::Validation)?;
     let target = resolve(&db, &address, false).await?;
@@ -217,12 +228,17 @@ struct PlaceResult {
 fn normalize_index(raw: &str) -> AppResult<String> {
     let value = raw.trim();
     if value.is_empty() || value.len() > 7 || !value.chars().all(|c| c.is_ascii_digit()) {
-        return Err(AppError::Validation(format!("«{value}» не похоже на INDEX устройства (7 цифр)")));
+        return Err(AppError::Validation(format!(
+            "«{value}» не похоже на INDEX устройства (7 цифр)"
+        )));
     }
     Ok(format!("{value:0>7}"))
 }
 
-async fn place(State(db): State<Db>, Json(input): Json<PlaceInput>) -> AppResult<Json<PlaceResult>> {
+async fn place(
+    State(db): State<Db>,
+    Json(input): Json<PlaceInput>,
+) -> AppResult<Json<PlaceResult>> {
     let separator = address_separator(&db).await?;
     let address = Address::parse(&input.shelf_code, &separator).map_err(AppError::Validation)?;
     let device_index = normalize_index(&input.device_index)?;
@@ -265,7 +281,9 @@ async fn place(State(db): State<Db>, Json(input): Json<PlaceInput>) -> AppResult
     .fetch_optional(&mut *tx)
     .await?;
     let unchanged = current.as_ref().is_some_and(|c| {
-        c.module_container_id == target.module_container_id && c.rack == address.rack && c.shelf == address.shelf
+        c.module_container_id == target.module_container_id
+            && c.rack == address.rack
+            && c.shelf == address.shelf
     });
 
     if !unchanged {

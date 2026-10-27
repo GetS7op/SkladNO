@@ -122,6 +122,21 @@ h2 {
   display: grid;
   gap: 5px;
 }
+/* Кнопка меню видна только на узком экране */
+.menu-toggle {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #292c24;
+  border-radius: 10px;
+  color: #f6f5ef;
+  background: #1c1f18;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 .nav-item {
   min-height: 42px;
   padding: 0 12px;
@@ -690,12 +705,29 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
   .sidebar {
-    position: static;
+    position: sticky;
+    z-index: 20;
     height: auto;
-    padding: 16px;
+    max-height: 100vh;
+    padding: 12px 16px;
+  }
+  .sidebar-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
   .brand {
-    padding-bottom: 14px;
+    padding: 0;
+  }
+  .menu-toggle {
+    display: flex;
+  }
+  .sidebar:not(.open) .sidebar-body {
+    display: none;
+  }
+  .sidebar-body {
+    margin-top: 16px;
   }
   .primary-nav {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

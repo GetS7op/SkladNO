@@ -51,11 +51,21 @@ fn tally<'a>(prefix: &str, values: impl Iterator<Item = &'a str>) -> Vec<(String
     }
     let mut pairs: Vec<_> = counts.into_iter().collect();
     pairs.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-    pairs.into_iter().map(|(k, n)| (format!("{prefix}: {k}"), n.into())).collect()
+    pairs
+        .into_iter()
+        .map(|(k, n)| (format!("{prefix}: {k}"), n.into()))
+        .collect()
 }
 
 pub const NAMES: [&str; 8] = [
-    "devices", "inventory", "clients", "deliveries", "pools", "workers", "containers", "modules",
+    "devices",
+    "inventory",
+    "clients",
+    "deliveries",
+    "pools",
+    "workers",
+    "containers",
+    "modules",
 ];
 
 pub async fn build(db: &Db, name: &str) -> AppResult<Option<Table>> {
@@ -94,14 +104,32 @@ async fn device_models(db: &Db) -> AppResult<Table> {
     .await?;
     let mut stats = vec![
         ("Моделей".to_string(), (rows.len() as i64).into()),
-        ("В архиве".to_string(), (rows.iter().filter(|r| r.archived).count() as i64).into()),
-        ("Устройств этих моделей".to_string(), rows.iter().map(|r| r.devices).sum::<i64>().into()),
+        (
+            "В архиве".to_string(),
+            (rows.iter().filter(|r| r.archived).count() as i64).into(),
+        ),
+        (
+            "Устройств этих моделей".to_string(),
+            rows.iter().map(|r| r.devices).sum::<i64>().into(),
+        ),
     ];
-    stats.extend(tally("Моделей производителя", rows.iter().map(|r| r.manufacturer.as_str())));
+    stats.extend(tally(
+        "Моделей производителя",
+        rows.iter().map(|r| r.manufacturer.as_str()),
+    ));
     Ok(Table {
         title: "Устройства (модели)".into(),
         file: "devices".into(),
-        columns: vec!["Производитель", "Модель", "XP, Th/s", "Потребление, Вт", "Размеры, мм", "Вес, кг", "Архив", "Устройств"],
+        columns: vec![
+            "Производитель",
+            "Модель",
+            "XP, Th/s",
+            "Потребление, Вт",
+            "Размеры, мм",
+            "Вес, кг",
+            "Архив",
+            "Устройств",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -155,21 +183,47 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     .await?;
     let placed = rows.iter().filter(|r| r.location.is_some()).count() as i64;
     let total_xp: f64 = rows.iter().filter_map(|r| r.hashrate_ths).sum();
-    let total_kw: f64 = rows.iter().filter_map(|r| r.power_w).map(f64::from).sum::<f64>() / 1000.0;
+    let total_kw: f64 = rows
+        .iter()
+        .filter_map(|r| r.power_w)
+        .map(f64::from)
+        .sum::<f64>()
+        / 1000.0;
     let mut stats = vec![
         ("Устройств".to_string(), (rows.len() as i64).into()),
         ("Размещено".to_string(), placed.into()),
-        ("Не размещено".to_string(), (rows.len() as i64 - placed).into()),
+        (
+            "Не размещено".to_string(),
+            (rows.len() as i64 - placed).into(),
+        ),
         ("Суммарный XP, Th/s".to_string(), total_xp.into()),
         ("Суммарное потребление, кВт".to_string(), total_kw.into()),
     ];
-    stats.extend(tally("Склад", rows.iter().map(|r| destination(&r.destination))));
+    stats.extend(tally(
+        "Склад",
+        rows.iter().map(|r| destination(&r.destination)),
+    ));
     stats.extend(tally("Клиент", rows.iter().map(|r| r.client.as_str())));
     stats.extend(tally("Модель", rows.iter().map(|r| r.model.as_str())));
     Ok(Table {
         title: "Реестр устройств".into(),
         file: "inventory".into(),
-        columns: vec!["Index", "UUID", "Производитель", "Модель", "XP, Th/s", "Потребление, Вт", "Клиент", "Поставка", "Дата поставки", "Склад", "Этап поставки", "Место", "MAC", "Серийный номер"],
+        columns: vec![
+            "Index",
+            "UUID",
+            "Производитель",
+            "Модель",
+            "XP, Th/s",
+            "Потребление, Вт",
+            "Клиент",
+            "Поставка",
+            "Дата поставки",
+            "Склад",
+            "Этап поставки",
+            "Место",
+            "MAC",
+            "Серийный номер",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -213,8 +267,14 @@ async fn clients(db: &Db) -> AppResult<Table> {
     .await?;
     let stats = vec![
         ("Клиентов".to_string(), (rows.len() as i64).into()),
-        ("Поставок".to_string(), rows.iter().map(|r| r.deliveries).sum::<i64>().into()),
-        ("Устройств".to_string(), rows.iter().map(|r| r.devices).sum::<i64>().into()),
+        (
+            "Поставок".to_string(),
+            rows.iter().map(|r| r.deliveries).sum::<i64>().into(),
+        ),
+        (
+            "Устройств".to_string(),
+            rows.iter().map(|r| r.devices).sum::<i64>().into(),
+        ),
     ];
     Ok(Table {
         title: "Клиенты".into(),
@@ -222,7 +282,14 @@ async fn clients(db: &Db) -> AppResult<Table> {
         columns: vec!["Наименование", "Заметка", "Поставок", "Устройств"],
         rows: rows
             .into_iter()
-            .map(|r| vec![r.name.into(), r.note.into(), r.deliveries.into(), r.devices.into()])
+            .map(|r| {
+                vec![
+                    r.name.into(),
+                    r.note.into(),
+                    r.deliveries.into(),
+                    r.devices.into(),
+                ]
+            })
             .collect(),
         stats,
     })
@@ -253,16 +320,40 @@ async fn deliveries(db: &Db) -> AppResult<Table> {
     .await?;
     let mut stats = vec![
         ("Поставок".to_string(), (rows.len() as i64).into()),
-        ("Устройств".to_string(), rows.iter().map(|r| r.devices).sum::<i64>().into()),
-        ("Размещено".to_string(), rows.iter().map(|r| r.placed).sum::<i64>().into()),
+        (
+            "Устройств".to_string(),
+            rows.iter().map(|r| r.devices).sum::<i64>().into(),
+        ),
+        (
+            "Размещено".to_string(),
+            rows.iter().map(|r| r.placed).sum::<i64>().into(),
+        ),
     ];
     stats.extend(tally("Этап", rows.iter().map(|r| stage(&r.stage))));
-    stats.extend(tally("Состояние", rows.iter().map(|r| condition(r.condition.as_deref()))));
-    stats.extend(tally("Назначение", rows.iter().map(|r| destination(&r.destination))));
+    stats.extend(tally(
+        "Состояние",
+        rows.iter().map(|r| condition(r.condition.as_deref())),
+    ));
+    stats.extend(tally(
+        "Назначение",
+        rows.iter().map(|r| destination(&r.destination)),
+    ));
     Ok(Table {
         title: "Поставки".into(),
         file: "deliveries".into(),
-        columns: vec!["Наименование", "Дата", "Клиент", "Группа устройств", "Документ-основание", "Назначение", "Состояние", "Таможенные", "Этап", "Устройств", "Размещено"],
+        columns: vec![
+            "Наименование",
+            "Дата",
+            "Клиент",
+            "Группа устройств",
+            "Документ-основание",
+            "Назначение",
+            "Состояние",
+            "Таможенные",
+            "Этап",
+            "Устройств",
+            "Размещено",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
@@ -306,18 +397,43 @@ async fn pools(db: &Db) -> AppResult<Table> {
     .await?;
     let stats = vec![
         ("Пулов".to_string(), (rows.len() as i64).into()),
-        ("Разрешено".to_string(), (rows.iter().filter(|r| r.allowed && !r.archived).count() as i64).into()),
-        ("В архиве".to_string(), (rows.iter().filter(|r| r.archived).count() as i64).into()),
-        ("Активных воркеров".to_string(), rows.iter().map(|r| r.workers).sum::<i64>().into()),
+        (
+            "Разрешено".to_string(),
+            (rows.iter().filter(|r| r.allowed && !r.archived).count() as i64).into(),
+        ),
+        (
+            "В архиве".to_string(),
+            (rows.iter().filter(|r| r.archived).count() as i64).into(),
+        ),
+        (
+            "Активных воркеров".to_string(),
+            rows.iter().map(|r| r.workers).sum::<i64>().into(),
+        ),
     ];
     Ok(Table {
         title: "Вайтлист пулов".into(),
         file: "pools".into(),
-        columns: vec!["Пул", "Стратум 1", "Стратум 2", "Стратум 3", "Разрешение", "Архив", "Воркеров"],
+        columns: vec![
+            "Пул",
+            "Стратум 1",
+            "Стратум 2",
+            "Стратум 3",
+            "Разрешение",
+            "Архив",
+            "Воркеров",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {
-                vec![r.name.into(), r.stratum1.into(), r.stratum2.into(), r.stratum3.into(), yes_no(r.allowed), yes_no(r.archived), r.workers.into()]
+                vec![
+                    r.name.into(),
+                    r.stratum1.into(),
+                    r.stratum2.into(),
+                    r.stratum3.into(),
+                    yes_no(r.allowed),
+                    yes_no(r.archived),
+                    r.workers.into(),
+                ]
             })
             .collect(),
         stats,
@@ -342,17 +458,32 @@ async fn workers(db: &Db) -> AppResult<Table> {
     .await?;
     let mut stats = vec![
         ("Воркеров".to_string(), (rows.len() as i64).into()),
-        ("В архиве".to_string(), (rows.iter().filter(|r| r.archived).count() as i64).into()),
+        (
+            "В архиве".to_string(),
+            (rows.iter().filter(|r| r.archived).count() as i64).into(),
+        ),
     ];
     stats.extend(tally("Пул", rows.iter().map(|r| r.pool.as_str())));
-    stats.extend(tally("Группа", rows.iter().map(|r| r.group_name.as_deref().unwrap_or("без группы"))));
+    stats.extend(tally(
+        "Группа",
+        rows.iter()
+            .map(|r| r.group_name.as_deref().unwrap_or("без группы")),
+    ));
     Ok(Table {
         title: "Вайтлист воркеров".into(),
         file: "workers".into(),
         columns: vec!["Пул", "Воркер", "Группа", "Вотчерлинк", "Архив"],
         rows: rows
             .into_iter()
-            .map(|r| vec![r.pool.into(), r.name.into(), r.group_name.into(), r.watcher_url.into(), yes_no(r.archived)])
+            .map(|r| {
+                vec![
+                    r.pool.into(),
+                    r.name.into(),
+                    r.group_name.into(),
+                    r.watcher_url.into(),
+                    yes_no(r.archived),
+                ]
+            })
             .collect(),
         stats,
     })
@@ -381,13 +512,32 @@ async fn containers(db: &Db) -> AppResult<Table> {
     let places = |r: &ContainerRow| i64::from(r.racks * r.shelves_per_rack * r.devices_per_shelf);
     let stats = vec![
         ("Шаблонов".to_string(), (rows.len() as i64).into()),
-        ("Экземпляров в модулях".to_string(), rows.iter().map(|r| r.instances).sum::<i64>().into()),
-        ("Мест во всех экземплярах".to_string(), rows.iter().map(|r| places(r) * r.instances).sum::<i64>().into()),
+        (
+            "Экземпляров в модулях".to_string(),
+            rows.iter().map(|r| r.instances).sum::<i64>().into(),
+        ),
+        (
+            "Мест во всех экземплярах".to_string(),
+            rows.iter()
+                .map(|r| places(r) * r.instances)
+                .sum::<i64>()
+                .into(),
+        ),
     ];
     Ok(Table {
         title: "Контейнеры".into(),
         file: "containers".into(),
-        columns: vec!["Наименование", "Сокращение", "Мощность, кВт", "Стеллажей", "Полок на стеллаж", "Устройств на полку", "Мест", "Полка, мм", "В модулях"],
+        columns: vec![
+            "Наименование",
+            "Сокращение",
+            "Мощность, кВт",
+            "Стеллажей",
+            "Полок на стеллаж",
+            "Устройств на полку",
+            "Мест",
+            "Полка, мм",
+            "В модулях",
+        ],
         rows: rows
             .iter()
             .map(|r| {
@@ -437,11 +587,22 @@ async fn modules(db: &Db) -> AppResult<Table> {
         ("Занято".to_string(), placed.into()),
         ("Свободно".to_string(), (capacity - placed).into()),
     ];
-    stats.extend(tally("Модулей на складе", rows.iter().map(|r| destination(&r.warehouse))));
+    stats.extend(tally(
+        "Модулей на складе",
+        rows.iter().map(|r| destination(&r.warehouse)),
+    ));
     Ok(Table {
         title: "Модули".into(),
         file: "modules".into(),
-        columns: vec!["№ модуля", "Расположение", "Склад", "Контейнеры", "Мест", "Занято", "Свободно"],
+        columns: vec![
+            "№ модуля",
+            "Расположение",
+            "Склад",
+            "Контейнеры",
+            "Мест",
+            "Занято",
+            "Свободно",
+        ],
         rows: rows
             .into_iter()
             .map(|r| {

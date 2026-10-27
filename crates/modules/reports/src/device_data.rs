@@ -49,7 +49,10 @@ async fn delivery_head(db: &Db, id: Uuid) -> AppResult<DeliveryHead> {
         .ok_or_else(|| AppError::NotFound("Поставка не найдена".into()))
 }
 
-async fn delivery_devices<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> AppResult<Vec<DeviceRow>> {
+async fn delivery_devices<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> AppResult<Vec<DeviceRow>> {
     Ok(sqlx::query_as::<_, DeviceRow>(
         "SELECT v.id, v.device_index, m.manufacturer, m.model, v.mac_address, v.serial_no \
          FROM devices v JOIN device_models m ON m.id = v.model_id WHERE v.delivery_id = $1 ORDER BY v.device_index",
@@ -84,7 +87,14 @@ pub async fn template(
     let table = Table {
         title: format!("Поставка {} — данные устройств", head.number),
         file: format!("template-{}", head.number),
-        columns: vec!["INDEX", "UUID", "Производитель", "Модель", "MAC", "Серийный номер"],
+        columns: vec![
+            "INDEX",
+            "UUID",
+            "Производитель",
+            "Модель",
+            "MAC",
+            "Серийный номер",
+        ],
         rows: devices
             .into_iter()
             .map(|d| {
@@ -107,11 +117,18 @@ pub async fn template(
         _ => table::to_csv(&table),
     };
     // Номер поставки кириллический — в имени файла его заменяет латинская транслитерация префикса.
-    let filename = format!("skladno-shablon-{}.{}", head.number.replace("ПУ", "PU"), format.extension());
+    let filename = format!(
+        "skladno-shablon-{}.{}",
+        head.number.replace("ПУ", "PU"),
+        format.extension()
+    );
     Ok((
         [
             (header::CONTENT_TYPE, format.content_type().to_string()),
-            (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{filename}\"")),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{filename}\""),
+            ),
         ],
         body,
     ))
@@ -120,7 +137,10 @@ pub async fn template(
 const COLUMNS: &[(&str, &[&str])] = &[
     ("index", &["index", "инвентарный номер", "индекс"]),
     ("mac", &["mac", "mac-адрес", "mac адрес"]),
-    ("serial", &["серийный номер", "серийный", "serial", "sn", "s/n"]),
+    (
+        "serial",
+        &["серийный номер", "серийный", "serial", "sn", "s/n"],
+    ),
 ];
 
 #[derive(Deserialize)]
@@ -160,10 +180,14 @@ pub async fn import(
     };
     let index = header_index(&rows[header_pos], COLUMNS);
     if !index.contains_key("index") {
-        return Err(AppError::Validation("Нет колонки «INDEX» — используйте шаблон поставки".into()));
+        return Err(AppError::Validation(
+            "Нет колонки «INDEX» — используйте шаблон поставки".into(),
+        ));
     }
     if !index.contains_key("mac") && !index.contains_key("serial") {
-        return Err(AppError::Validation("Нет колонок «MAC» и «Серийный номер» — нечего загружать".into()));
+        return Err(AppError::Validation(
+            "Нет колонок «MAC» и «Серийный номер» — нечего загружать".into(),
+        ));
     }
     let data: Vec<(usize, &Vec<String>)> = rows
         .iter()
@@ -173,7 +197,9 @@ pub async fn import(
         .map(|(i, r)| (i + 1, r))
         .collect();
     if data.len() > MAX_ROWS {
-        return Err(AppError::Validation(format!("Не больше {MAX_ROWS} строк за одну загрузку")));
+        return Err(AppError::Validation(format!(
+            "Не больше {MAX_ROWS} строк за одну загрузку"
+        )));
     }
 
     let mut tx = db.begin().await?;
@@ -185,16 +211,34 @@ pub async fn import(
     .bind(id)
     .fetch_all(&mut *tx)
     .await?;
-    let by_index: HashMap<&str, &DeviceRow> = devices.iter().map(|d| (d.device_index.as_str(), d)).collect();
+    let by_index: HashMap<&str, &DeviceRow> = devices
+        .iter()
+        .map(|d| (d.device_index.as_str(), d))
+        .collect();
 
-    let mut report = DeviceDataReport { dry_run: query.dry_run, total: data.len(), created: 0, skipped: 0, errors: vec![] };
+    let mut report = DeviceDataReport {
+        dry_run: query.dry_run,
+        total: data.len(),
+        created: 0,
+        skipped: 0,
+        errors: vec![],
+    };
     let mut seen_macs: HashMap<String, usize> = HashMap::new();
     for (line, row) in data {
-        let cell = |key: &str| index.get(key).and_then(|i| row.get(*i)).map(|v| v.trim()).unwrap_or("");
+        let cell = |key: &str| {
+            index
+                .get(key)
+                .and_then(|i| row.get(*i))
+                .map(|v| v.trim())
+                .unwrap_or("")
+        };
         let mut error = |message: String| report.errors.push(RowError { row: line, message });
 
         let raw_index = cell("index");
-        let device_index = if raw_index.len() < 7 && raw_index.chars().all(|c| c.is_ascii_digit()) && !raw_index.is_empty() {
+        let device_index = if raw_index.len() < 7
+            && raw_index.chars().all(|c| c.is_ascii_digit())
+            && !raw_index.is_empty()
+        {
             format!("{raw_index:0>7}")
         } else {
             raw_index.to_string()

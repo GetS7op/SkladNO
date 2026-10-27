@@ -240,12 +240,18 @@ async fn load(db: &Db, id: Uuid) -> AppResult<DeliveryDetail> {
     .bind(id)
     .fetch_all(db)
     .await?;
-    Ok(DeliveryDetail { summary, lines, devices })
+    Ok(DeliveryDetail {
+        summary,
+        lines,
+        devices,
+    })
 }
 
 fn validate_lines(lines: &[LineInput]) -> AppResult<i32> {
     if lines.is_empty() {
-        return Err(AppError::Validation("Добавьте хотя бы одну строку с моделью".into()));
+        return Err(AppError::Validation(
+            "Добавьте хотя бы одну строку с моделью".into(),
+        ));
     }
     let mut seen = HashSet::new();
     let mut total: i32 = 0;
@@ -294,12 +300,15 @@ async fn create(
         return Ok((StatusCode::OK, Json(load(&db, id).await?)));
     }
 
-    let client_exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM clients WHERE id = $1)")
-        .bind(input.client_id)
-        .fetch_one(&mut *tx)
-        .await?;
+    let client_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM clients WHERE id = $1)")
+            .bind(input.client_id)
+            .fetch_one(&mut *tx)
+            .await?;
     if !client_exists {
-        return Err(AppError::Validation("Выберите клиента из справочника".into()));
+        return Err(AppError::Validation(
+            "Выберите клиента из справочника".into(),
+        ));
     }
 
     let model_ids: Vec<Uuid> = input.lines.iter().map(|l| l.model_id).collect();
@@ -329,10 +338,12 @@ async fn create(
     })?;
 
     let year = input.delivery_date.year();
-    let seq = sqlx::query_scalar::<_, i32>("SELECT COALESCE(max(seq), 0) + 1 FROM deliveries WHERE year = $1")
-        .bind(year)
-        .fetch_one(&mut *tx)
-        .await?;
+    let seq = sqlx::query_scalar::<_, i32>(
+        "SELECT COALESCE(max(seq), 0) + 1 FROM deliveries WHERE year = $1",
+    )
+    .bind(year)
+    .fetch_one(&mut *tx)
+    .await?;
     let number = format!("ПУ-{year}-{seq:04}");
 
     let id = sqlx::query_scalar::<_, Uuid>(
@@ -416,17 +427,21 @@ async fn advance(
     Json(input): Json<AdvanceInput>,
 ) -> AppResult<Json<DeliveryDetail>> {
     let mut tx = db.begin().await?;
-    let stage = sqlx::query_scalar::<_, String>("SELECT stage FROM deliveries WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Поставка не найдена".into()))?;
+    let stage =
+        sqlx::query_scalar::<_, String>("SELECT stage FROM deliveries WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Поставка не найдена".into()))?;
     if stage != input.expected_stage {
         return Err(AppError::Conflict(
             "Этап поставки уже изменён другим пользователем — обновите страницу".into(),
         ));
     }
-    let position = STAGES.iter().position(|s| *s == stage).unwrap_or(STAGES.len() - 1);
+    let position = STAGES
+        .iter()
+        .position(|s| *s == stage)
+        .unwrap_or(STAGES.len() - 1);
     let Some(next) = STAGES.get(position + 1) else {
         return Err(AppError::Conflict("Поставка уже закрыта".into()));
     };
@@ -463,7 +478,10 @@ struct WarningFacts {
 
 /// Некритические замечания к поставке перед подтверждением и закрытием (SPEC: закрытие
 /// с ними разрешено, пользователь видит их и подтверждает).
-async fn stage_warnings<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> AppResult<Vec<String>> {
+async fn stage_warnings<'e, E: sqlx::PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> AppResult<Vec<String>> {
     let f = sqlx::query_as::<_, WarningFacts>(
         "SELECT (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id) AS devices, \
          (SELECT count(*) FROM devices v WHERE v.delivery_id = d.id \
@@ -477,7 +495,10 @@ async fn stage_warnings<'e, E: sqlx::PgExecutor<'e>>(executor: E, id: Uuid) -> A
     .ok_or_else(|| AppError::NotFound("Поставка не найдена".into()))?;
     let mut warnings = Vec::new();
     if f.unplaced > 0 {
-        warnings.push(format!("Не размещено устройств: {} из {}", f.unplaced, f.devices));
+        warnings.push(format!(
+            "Не размещено устройств: {} из {}",
+            f.unplaced, f.devices
+        ));
     }
     if f.basis_doc.is_none() && f.files == 0 {
         warnings.push("Нет документа-основания: не указан номер и не прикреплены файлы".into());
@@ -494,5 +515,7 @@ struct Warnings {
 }
 
 async fn warnings(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<Warnings>> {
-    Ok(Json(Warnings { warnings: stage_warnings(&db, id).await? }))
+    Ok(Json(Warnings {
+        warnings: stage_warnings(&db, id).await?,
+    }))
 }

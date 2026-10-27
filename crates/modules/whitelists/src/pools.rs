@@ -69,7 +69,9 @@ fn validate(input: PoolInput) -> AppResult<PoolFields> {
         .filter_map(|s| text::clean(Some(s)))
         .collect();
     if strata.is_empty() {
-        return Err(AppError::Validation("Нужен хотя бы один стратум-линк".into()));
+        return Err(AppError::Validation(
+            "Нужен хотя бы один стратум-линк".into(),
+        ));
     }
     if strata.len() > 3 {
         return Err(AppError::Validation("Не больше трёх стратум-линков".into()));
@@ -108,7 +110,10 @@ async fn fetch(db: &Db, id: Uuid) -> AppResult<Pool> {
         .ok_or_else(|| AppError::NotFound("Пул не найден".into()))
 }
 
-async fn create(State(db): State<Db>, Json(input): Json<PoolInput>) -> AppResult<(StatusCode, Json<Pool>)> {
+async fn create(
+    State(db): State<Db>,
+    Json(input): Json<PoolInput>,
+) -> AppResult<(StatusCode, Json<Pool>)> {
     let fields = validate(input)?;
     let mut tx = db.begin().await?;
     let id = sqlx::query_scalar::<_, Uuid>(
@@ -154,7 +159,14 @@ async fn update(
     .execute(&mut *tx)
     .await
     .map_err(AppError::unique_as(duplicate(&fields.name)))?;
-    audit::record(&mut *tx, "pool", id, "update", audit::diff(&before, &fields)).await?;
+    audit::record(
+        &mut *tx,
+        "pool",
+        id,
+        "update",
+        audit::diff(&before, &fields),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(fetch(&db, id).await?))
 }
@@ -169,11 +181,12 @@ async fn restore(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<P
 
 async fn set_archived(db: Db, id: Uuid, archived: bool) -> AppResult<Json<Pool>> {
     let mut tx = db.begin().await?;
-    let before = sqlx::query_scalar::<_, bool>("SELECT archived FROM pools WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Пул не найден".into()))?;
+    let before =
+        sqlx::query_scalar::<_, bool>("SELECT archived FROM pools WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Пул не найден".into()))?;
     sqlx::query("UPDATE pools SET archived = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(archived)

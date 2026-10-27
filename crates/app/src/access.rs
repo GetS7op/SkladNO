@@ -7,7 +7,10 @@ use axum::{
     middleware::Next,
     response::{IntoResponse, Response},
 };
-use skladno_core::{AppError, Db, auth::{self, Role}};
+use skladno_core::{
+    AppError, Db,
+    auth::{self, Role},
+};
 
 /// Минимальная роль для запроса. None — маршрут открыт без входа.
 fn required_role(method: &Method, path: &str) -> Option<Role> {
@@ -74,9 +77,18 @@ mod tests {
         assert_eq!(required_role(&get, "/devices"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/deliveries"), Some(Role::Operator));
         assert_eq!(required_role(&post, "/placements"), Some(Role::Operator));
-        assert_eq!(required_role(&post, "/deliveries/1/advance"), Some(Role::Operator));
-        assert_eq!(required_role(&post, "/deliveries/1/files"), Some(Role::Operator));
-        assert_eq!(required_role(&post, "/deliveries/1/devices/import"), Some(Role::Operator));
+        assert_eq!(
+            required_role(&post, "/deliveries/1/advance"),
+            Some(Role::Operator)
+        );
+        assert_eq!(
+            required_role(&post, "/deliveries/1/files"),
+            Some(Role::Operator)
+        );
+        assert_eq!(
+            required_role(&post, "/deliveries/1/devices/import"),
+            Some(Role::Operator)
+        );
         assert_eq!(required_role(&post, "/devices"), Some(Role::Senior));
         assert_eq!(required_role(&put, "/modules/1"), Some(Role::Senior));
         assert_eq!(required_role(&put, "/inventory/1"), Some(Role::Operator));

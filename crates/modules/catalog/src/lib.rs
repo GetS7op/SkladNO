@@ -64,11 +64,18 @@ fn validate(input: DeviceModelInput) -> AppResult<DeviceModelInput> {
     if model.is_empty() {
         return Err(AppError::Validation("Укажите модель".into()));
     }
-    if input.hashrate_ths.is_some_and(|v| !v.is_finite() || v < 0.0) {
-        return Err(AppError::Validation("Хешрейт должен быть неотрицательным числом".into()));
+    if input
+        .hashrate_ths
+        .is_some_and(|v| !v.is_finite() || v < 0.0)
+    {
+        return Err(AppError::Validation(
+            "Хешрейт должен быть неотрицательным числом".into(),
+        ));
     }
     if input.power_w.is_some_and(|v| v < 0) {
-        return Err(AppError::Validation("Энергопотребление не может быть отрицательным".into()));
+        return Err(AppError::Validation(
+            "Энергопотребление не может быть отрицательным".into(),
+        ));
     }
     let dimensions_mm =
         format_dimensions(input.dimensions_mm.as_deref()).map_err(AppError::Validation)?;
@@ -161,7 +168,14 @@ async fn update(
     .fetch_one(&mut *tx)
     .await
     .map_err(AppError::unique_as(duplicate_message(&input)))?;
-    audit::record(&mut *tx, "device_model", id, "update", audit::diff(&before, &row)).await?;
+    audit::record(
+        &mut *tx,
+        "device_model",
+        id,
+        "update",
+        audit::diff(&before, &row),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(row))
 }
@@ -186,7 +200,14 @@ async fn set_archived(db: Db, id: Uuid, archived: bool) -> AppResult<Json<Device
     .fetch_one(&mut *tx)
     .await?;
     let action = if archived { "archive" } else { "restore" };
-    audit::record(&mut *tx, "device_model", id, action, audit::diff(&before, &row)).await?;
+    audit::record(
+        &mut *tx,
+        "device_model",
+        id,
+        action,
+        audit::diff(&before, &row),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(row))
 }

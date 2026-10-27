@@ -24,7 +24,6 @@ services:
   # (APP_BIND=0.0.0.0 — открыть HTTP в сеть без шифрования, если HTTPS не нужен).
   app:
     build: .
-    image: skladno:latest
     environment:
       DATABASE_URL: postgres://skladno:${POSTGRES_PASSWORD}@postgres:5432/skladno
     ports:

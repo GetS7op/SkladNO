@@ -41,8 +41,12 @@ pub fn diff<T: Serialize>(before: &T, after: &T) -> Value {
         .into_iter()
         .filter_map(|(key, new_value)| {
             let old_value = old.get(&key).cloned().unwrap_or(Value::Null);
-            (old_value != new_value)
-                .then(|| (key, serde_json::json!({ "old": old_value, "new": new_value })))
+            (old_value != new_value).then(|| {
+                (
+                    key,
+                    serde_json::json!({ "old": old_value, "new": new_value }),
+                )
+            })
         })
         .collect();
     Value::Object(changed)

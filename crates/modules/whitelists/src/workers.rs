@@ -78,19 +78,27 @@ fn duplicate(name: &str) -> String {
     format!("Воркер «{name}» уже есть в этом пуле")
 }
 
-async fn ensure_pool(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, pool_id: Uuid) -> AppResult<()> {
+async fn ensure_pool(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    pool_id: Uuid,
+) -> AppResult<()> {
     let active = sqlx::query_scalar::<_, bool>("SELECT NOT archived FROM pools WHERE id = $1")
         .bind(pool_id)
         .fetch_optional(&mut **tx)
         .await?;
     match active {
         Some(true) => Ok(()),
-        Some(false) => Err(AppError::Validation("Пул в архиве — выберите другой".into())),
+        Some(false) => Err(AppError::Validation(
+            "Пул в архиве — выберите другой".into(),
+        )),
         None => Err(AppError::Validation("Выберите пул из вайтлиста".into())),
     }
 }
 
-async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult<Json<Vec<Worker>>> {
+async fn list(
+    State(db): State<Db>,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<Vec<Worker>>> {
     let rows = sqlx::query_as::<_, Worker>(&format!(
         "{SELECT} WHERE w.archived = $1 AND ($2::text IS NULL OR w.name ILIKE $2 OR w.group_name ILIKE $2 \
          OR p.name ILIKE $2) ORDER BY lower(p.name), lower(w.name)"
@@ -170,7 +178,14 @@ async fn update(
     .execute(&mut *tx)
     .await
     .map_err(AppError::unique_as(duplicate(&fields.name)))?;
-    audit::record(&mut *tx, "worker", id, "update", audit::diff(&before, &fields)).await?;
+    audit::record(
+        &mut *tx,
+        "worker",
+        id,
+        "update",
+        audit::diff(&before, &fields),
+    )
+    .await?;
     tx.commit().await?;
     Ok(Json(fetch(&db, id).await?))
 }
@@ -185,11 +200,12 @@ async fn restore(State(db): State<Db>, Path(id): Path<Uuid>) -> AppResult<Json<W
 
 async fn set_archived(db: Db, id: Uuid, archived: bool) -> AppResult<Json<Worker>> {
     let mut tx = db.begin().await?;
-    let before = sqlx::query_scalar::<_, bool>("SELECT archived FROM workers WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Воркер не найден".into()))?;
+    let before =
+        sqlx::query_scalar::<_, bool>("SELECT archived FROM workers WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Воркер не найден".into()))?;
     sqlx::query("UPDATE workers SET archived = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(archived)

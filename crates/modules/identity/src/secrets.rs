@@ -14,9 +14,11 @@ pub fn hash_password(password: &str) -> AppResult<String> {
 }
 
 pub fn verify_password(password: &str, encoded: &str) -> bool {
-    PasswordHash::new(encoded)
-        .ok()
-        .is_some_and(|hash| Argon2::default().verify_password(password.as_bytes(), &hash).is_ok())
+    PasswordHash::new(encoded).ok().is_some_and(|hash| {
+        Argon2::default()
+            .verify_password(password.as_bytes(), &hash)
+            .is_ok()
+    })
 }
 
 /// Хеш несуществующего пароля: проверяем его при неизвестном логине, чтобы время ответа

@@ -6,7 +6,10 @@ use std::net::SocketAddr;
 
 use axum::{
     Json, Router,
-    extract::{Query, State},
+    extract::{Query, Request, State},
+    http::{HeaderValue, header},
+    middleware::{self, Next},
+    response::Response,
     routing::get,
 };
 use chrono::{DateTime, Utc};
@@ -49,7 +52,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(skladno_locations::router())
         .merge(skladno_identity::router())
         .merge(skladno_reports::router())
-        .route_layer(axum::middleware::from_fn_with_state(db.clone(), access::guard));
+        .route_layer(axum::middleware::from_fn_with_state(
+            db.clone(),
+            access::guard,
+        ));
 
     let mut app = Router::new()
         .nest("/api/v1", api)
@@ -59,7 +65,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // В продакшене backend отдаёт собранный frontend; в разработке его обслуживает Vite.
     if let Ok(dir) = std::env::var("STATIC_DIR") {
         let index = format!("{dir}/index.html");
-        app = app.fallback_service(ServeDir::new(dir).fallback(ServeFile::new(index)));
+        let frontend = Router::new()
+            .fallback_service(ServeDir::new(dir).fallback(ServeFile::new(index)))
+            .layer(middleware::from_fn(cache_control));
+        app = app.merge(frontend);
     }
 
     let listener = tokio::net::TcpListener::bind(bind).await?;
@@ -70,6 +79,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .await?;
     Ok(())
+}
+
+/// Файлы из /assets/ с хешем в имени не меняются — кэшируются надолго. Остальное (index.html,
+/// sw.js, манифест) браузер сверяет с сервером, чтобы после обновления сразу получить новую версию.
+async fn cache_control(request: Request, next: Next) -> Response {
+    let immutable = request.uri().path().starts_with("/assets/");
+    let mut response = next.run(request).await;
+    let value = if immutable {
+        "public, max-age=31536000, immutable"
+    } else {
+        "no-cache"
+    };
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(value));
+    response
 }
 
 #[derive(Deserialize)]

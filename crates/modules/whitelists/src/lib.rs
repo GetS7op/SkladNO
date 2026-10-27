@@ -7,7 +7,9 @@ use axum::Router;
 use skladno_core::Db;
 
 pub fn router() -> Router<Db> {
-    Router::new().merge(pools::router()).merge(workers::router())
+    Router::new()
+        .merge(pools::router())
+        .merge(workers::router())
 }
 
 #[derive(Debug, serde::Deserialize)]

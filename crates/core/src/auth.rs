@@ -94,13 +94,23 @@ mod tests {
     #[tokio::test]
     async fn scope_sets_current_user() {
         assert!(current().is_none());
-        let user = CurrentUser { id: Uuid::nil(), login: "ivanov".into(), role: Role::Senior };
+        let user = CurrentUser {
+            id: Uuid::nil(),
+            login: "ivanov".into(),
+            role: Role::Senior,
+        };
         scope(Some(user), async {
             assert_eq!(current().unwrap().login, "ivanov");
             assert!(require(Role::Senior, "Тест").is_ok());
-            assert!(matches!(require(Role::Admin, "Тест"), Err(AppError::Forbidden(_))));
+            assert!(matches!(
+                require(Role::Admin, "Тест"),
+                Err(AppError::Forbidden(_))
+            ));
         })
         .await;
-        assert!(matches!(require(Role::Operator, "Тест"), Err(AppError::Unauthorized)));
+        assert!(matches!(
+            require(Role::Operator, "Тест"),
+            Err(AppError::Unauthorized)
+        ));
     }
 }

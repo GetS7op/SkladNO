@@ -80,18 +80,26 @@ const INSTANCES: &str = "SELECT mc.id, mc.module_id, mc.number, mc.container_id,
 
 fn validate(input: &ModuleInput) -> AppResult<()> {
     if input.number <= 0 {
-        return Err(AppError::Validation("Порядковый номер модуля — целое число больше нуля".into()));
+        return Err(AppError::Validation(
+            "Порядковый номер модуля — целое число больше нуля".into(),
+        ));
     }
     if !matches!(input.warehouse.as_str(), "park" | "workshop") {
-        return Err(AppError::Validation("Выберите склад: Парк или Мастерская".into()));
+        return Err(AppError::Validation(
+            "Выберите склад: Парк или Мастерская".into(),
+        ));
     }
     if input.containers.is_empty() {
-        return Err(AppError::Validation("Добавьте в модуль хотя бы один контейнер".into()));
+        return Err(AppError::Validation(
+            "Добавьте в модуль хотя бы один контейнер".into(),
+        ));
     }
     let mut seen = HashSet::new();
     for c in &input.containers {
         if c.number <= 0 {
-            return Err(AppError::Validation("Номер контейнера — целое число больше нуля".into()));
+            return Err(AppError::Validation(
+                "Номер контейнера — целое число больше нуля".into(),
+            ));
         }
         if !seen.insert(c.number) {
             return Err(AppError::Validation(format!(
@@ -129,7 +137,10 @@ async fn assemble(db: &Db, modules: Vec<ModuleRow>) -> AppResult<Vec<Module>> {
         .collect())
 }
 
-async fn list(State(db): State<Db>, Query(query): Query<ListQuery>) -> AppResult<Json<Vec<Module>>> {
+async fn list(
+    State(db): State<Db>,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<Vec<Module>>> {
     let modules = sqlx::query_as::<_, ModuleRow>(
         "SELECT id, number, location, warehouse FROM modules \
          WHERE ($1::text IS NULL OR location ILIKE $1 OR number::text = $2) \
@@ -153,11 +164,13 @@ async fn locations(State(db): State<Db>) -> AppResult<Json<Vec<String>>> {
 }
 
 async fn fetch(db: &Db, id: Uuid) -> AppResult<Module> {
-    let module = sqlx::query_as::<_, ModuleRow>("SELECT id, number, location, warehouse FROM modules WHERE id = $1")
-        .bind(id)
-        .fetch_optional(db)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Модуль не найден".into()))?;
+    let module = sqlx::query_as::<_, ModuleRow>(
+        "SELECT id, number, location, warehouse FROM modules WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(db)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Модуль не найден".into()))?;
     Ok(assemble(db, vec![module]).await?.remove(0))
 }
 
@@ -165,13 +178,21 @@ async fn ensure_containers(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     input: &ModuleInput,
 ) -> AppResult<()> {
-    let ids: Vec<Uuid> = input.containers.iter().map(|c| c.container_id).collect::<HashSet<_>>().into_iter().collect();
+    let ids: Vec<Uuid> = input
+        .containers
+        .iter()
+        .map(|c| c.container_id)
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
     let found = sqlx::query_scalar::<_, i64>("SELECT count(*) FROM containers WHERE id = ANY($1)")
         .bind(&ids)
         .fetch_one(&mut **tx)
         .await?;
     if found != ids.len() as i64 {
-        return Err(AppError::Validation("Выберите тип контейнера из реестра контейнеров".into()));
+        return Err(AppError::Validation(
+            "Выберите тип контейнера из реестра контейнеров".into(),
+        ));
     }
     Ok(())
 }
@@ -276,7 +297,11 @@ async fn update(
         )));
     }
 
-    let wanted: HashMap<i32, Uuid> = input.containers.iter().map(|c| (c.number, c.container_id)).collect();
+    let wanted: HashMap<i32, Uuid> = input
+        .containers
+        .iter()
+        .map(|c| (c.number, c.container_id))
+        .collect();
     let mut removed = Vec::new();
     let mut retyped = Vec::new();
     for inst in &existing {
@@ -334,7 +359,10 @@ async fn update(
     );
     if let Some(map) = changes.as_object_mut() {
         if !added.is_empty() {
-            map.insert("containers_added".into(), json!(added.iter().map(|c| c.number).collect::<Vec<_>>()));
+            map.insert(
+                "containers_added".into(),
+                json!(added.iter().map(|c| c.number).collect::<Vec<_>>()),
+            );
         }
         if !removed.is_empty() {
             map.insert("containers_removed".into(), json!(removed.len()));
