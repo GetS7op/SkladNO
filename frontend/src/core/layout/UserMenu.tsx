@@ -1,13 +1,14 @@
-import { KeyRound, LogOut } from 'lucide-react';
+import { Eye, KeyRound, LogOut } from 'lucide-react';
 import { useState } from 'react';
-import { useMe } from '../auth/context';
-import { roleLabel } from '../domain';
+import { useAuth, useMe } from '../auth/context';
+import { ROLES, type Role, roleLabel } from '../domain';
 import { ErrorBanner, Field, Modal } from '../ui/ui';
 import { useChangePassword, useLogout } from '../../modules/identity/hooks';
 
-/** Карточка пользователя внизу меню: роль, смена пароля, выход. */
+/** Карточка пользователя внизу меню: роль, вид роли (администратор), смена пароля, выход. */
 export function UserMenu() {
   const me = useMe();
+  const { viewRole, setViewRole } = useAuth();
   const [changing, setChanging] = useState(false);
   const logout = useLogout();
 
@@ -21,6 +22,25 @@ export function UserMenu() {
           {roleLabel(me.role)} · {me.login}
         </span>
       </div>
+      {me.role === 'admin' && (
+        <label className="view-role" title="Показать интерфейс так, как его видит выбранная роль">
+          <Eye size={16} />
+          <select
+            value={viewRole ?? 'admin'}
+            onChange={(e) => {
+              const role = e.target.value as Role;
+              setViewRole(role === 'admin' ? null : role);
+            }}
+            aria-label="Вид интерфейса для роли"
+          >
+            {[...ROLES].reverse().map((r) => (
+              <option key={r.value} value={r.value}>
+                Вид: {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="user-actions">
         <button type="button" className="nav-item" onClick={() => setChanging(true)}>
           <KeyRound size={16} /> Сменить пароль

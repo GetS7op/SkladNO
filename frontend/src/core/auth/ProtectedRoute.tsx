@@ -4,7 +4,7 @@ import { isNetworkError } from '../api/client';
 import { hasRole, type Role } from '../domain';
 import { ErrorBanner } from '../ui/ui';
 import { AuthScreen } from '../../modules/identity/pages/AuthScreen';
-import { useAuth } from './context';
+import { effectiveRole, useAuth } from './context';
 
 /** Пускает только после входа; при первом запуске ведёт на создание администратора. */
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -37,7 +37,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
 /** Раздел только для роли не ниже `min` (например, «Пользователи» — администратору). */
 export function RoleRoute({ min, children }: { min: Role; children: ReactNode }) {
-  const { user } = useAuth();
-  if (!user || !hasRole(user.role, min)) return <Navigate to="/" replace />;
+  const { user, viewRole } = useAuth();
+  if (!user || !hasRole(effectiveRole(user.role, viewRole), min)) return <Navigate to="/" replace />;
   return children;
 }

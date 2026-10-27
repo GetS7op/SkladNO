@@ -1,18 +1,17 @@
 import {
-  Activity,
   Boxes,
   ClipboardList,
   Container,
   Cpu,
   History,
+  Home,
   Map,
-  MapPinned,
   Network,
   PackagePlus,
-  ScanBarcode,
   Server,
   Settings,
   Settings2,
+  SlidersHorizontal,
   ShieldCheck,
   Users,
   Warehouse,
@@ -31,43 +30,40 @@ export type NavItem = {
 /** Раздел меню: заголовок раскрывает подпункты. */
 export type NavSection = { title: string; icon: LucideIcon; items: NavItem[] };
 
+/** «Главная» — реестр INDEX, отдельным пунктом над разделами. */
+export const NAV_HOME: NavItem = { to: '/inventory', label: 'Главная', icon: Home, minRole: 'operator' };
+
 export const NAV: NavSection[] = [
   {
     title: 'Учёт',
     icon: ClipboardList,
-    items: [
-      { to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' },
-      { to: '/inventory', label: 'Реестр INDEX', icon: ScanBarcode, minRole: 'operator' },
-      { to: '/devices', label: 'Устройства', icon: Cpu, minRole: 'operator' },
-      { to: '/clients', label: 'Клиенты', icon: Users, minRole: 'operator' },
-    ],
+    items: [{ to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' }],
   },
   {
-    title: 'Размещение',
-    icon: MapPinned,
-    items: [
-      { to: '/warehouses', label: 'Склады', icon: Warehouse, minRole: 'operator' },
-      { to: '/map', label: 'Карта', icon: Map, minRole: 'operator' },
-      { to: '/modules', label: 'Модули', icon: Boxes, minRole: 'operator' },
-      { to: '/containers', label: 'Контейнеры', icon: Container, minRole: 'operator' },
-    ],
-  },
-  {
-    title: 'Мониторинг',
-    icon: Activity,
+    title: 'Преднастройки',
+    icon: SlidersHorizontal,
     items: [
       { to: '/pools', label: 'Вайтлист пулов', icon: Network, minRole: 'operator' },
       { to: '/workers', label: 'Вайтлист воркеров', icon: Server, minRole: 'operator' },
     ],
   },
   {
+    title: 'Настройки',
+    icon: Settings,
+    items: [
+      { to: '/warehouses', label: 'Склады', icon: Warehouse, minRole: 'operator' },
+      { to: '/map', label: 'Карта', icon: Map, minRole: 'operator' },
+      { to: '/modules', label: 'Модули', icon: Boxes, minRole: 'operator' },
+      { to: '/containers', label: 'Контейнеры', icon: Container, minRole: 'operator' },
+      { to: '/devices', label: 'Устройства', icon: Cpu, minRole: 'operator' },
+      { to: '/clients', label: 'Клиенты', icon: Users, minRole: 'operator' },
+      { to: '/users', label: 'Пользователи', icon: ShieldCheck, minRole: 'admin' },
+    ],
+  },
+  {
     title: 'Система',
     icon: Settings2,
-    items: [
-      { to: '/audit', label: 'Журнал', icon: History, minRole: 'operator' },
-      { to: '/users', label: 'Пользователи', icon: ShieldCheck, minRole: 'admin' },
-      { to: '/settings', label: 'Настройки', icon: Settings, minRole: 'admin' },
-    ],
+    items: [{ to: '/audit', label: 'Журнал', icon: History, minRole: 'operator' }],
   },
 ];
 
@@ -79,14 +75,15 @@ export function navForRole(role: Role): NavSection[] {
   })).filter((section) => section.items.length > 0);
 }
 
-/** Раздел меню, к которому относится адрес (для подсветки и заголовка). */
-/** Раздел меню, в котором открытая страница. */
+/** Раздел меню, в котором открытая страница (null — «Главная» или страница вне меню). */
 export function navSectionFromPathname(pathname: string): NavSection | null {
   const item = navItemFromPathname(pathname);
   return NAV.find((section) => item && section.items.includes(item)) ?? null;
 }
 
+/** Пункт меню, к которому относится адрес (для подсветки и заголовка). */
 export function navItemFromPathname(pathname: string): NavItem | null {
+  if (pathname === '/' || pathname === NAV_HOME.to || pathname.startsWith(`${NAV_HOME.to}/`)) return NAV_HOME;
   for (const section of NAV) {
     for (const item of section.items) {
       if (pathname === item.to || pathname.startsWith(`${item.to}/`)) return item;

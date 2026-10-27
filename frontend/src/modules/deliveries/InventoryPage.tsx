@@ -37,7 +37,7 @@ const COLUMNS: Column<InventoryItem>[] = [
   },
 ];
 
-/** Реестр INDEX: поиск устройства по INDEX, MAC, серийному номеру, модели, клиенту, поставке. */
+/** Главная — реестр INDEX: поиск устройства по INDEX, MAC, серийному номеру, модели, клиенту, поставке. */
 export function InventoryPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
@@ -52,8 +52,8 @@ export function InventoryPage() {
   return (
     <>
       <Registry
-        title="Реестр INDEX"
-        subtitle="Все устройства из всех поставок: поиск по INDEX, MAC, серийному номеру, модели, клиенту"
+        title="Главная"
+        subtitle="Реестр INDEX — все устройства из всех поставок: поиск по INDEX, MAC, серийному номеру, модели, клиенту"
         search={search}
         onSearch={setSearch}
         options={exportOptions('inventory')}

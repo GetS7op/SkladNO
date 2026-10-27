@@ -699,6 +699,36 @@ textarea:focus {
   font-size: 12px;
   color: #878b80;
 }
+/* Переключатель вида роли (администратор) */
+.view-role {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: #9da097;
+}
+.view-role select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #292c24;
+  border-radius: 8px;
+  color: #f6f5ef;
+  background: #1c1f18;
+  font-size: 13px;
+}
+.view-role-banner {
+  color: var(--accent-ink);
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.view-role-banner span {
+  flex: 1;
+  min-width: 200px;
+}
 .user-actions {
   display: grid;
   gap: 2px;

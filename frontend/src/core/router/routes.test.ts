@@ -20,6 +20,9 @@ describe('navForRole', () => {
 
 describe('navItemFromPathname', () => {
   it.each([
+    ['/', 'Главная'],
+    ['/inventory', 'Главная'],
+    ['/inventory/0f1e', 'Главная'],
     ['/deliveries', 'Поставки'],
     ['/deliveries/new', 'Поставки'],
     ['/deliveries/0f1e', 'Поставки'],
@@ -38,14 +41,17 @@ describe('navItemFromPathname', () => {
 
 describe('navSectionFromPathname', () => {
   it.each([
-    ['/inventory/0f1e', 'Учёт'],
-    ['/labels/shelves', 'Размещение'],
-    ['/settings', 'Система'],
+    ['/deliveries/new', 'Учёт'],
+    ['/labels/shelves', 'Настройки'],
+    ['/users', 'Настройки'],
+    ['/pools', 'Преднастройки'],
+    ['/audit', 'Система'],
   ])('%s → %s', (pathname, title) => {
     expect(navSectionFromPathname(pathname)?.title).toBe(title);
   });
 
-  it('returns null outside the menu', () => {
+  it('returns null for the home page and outside the menu', () => {
+    expect(navSectionFromPathname('/inventory')).toBeNull();
     expect(navSectionFromPathname('/nowhere')).toBeNull();
   });
 });

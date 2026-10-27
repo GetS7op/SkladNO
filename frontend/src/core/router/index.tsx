@@ -27,9 +27,6 @@ const InventoryPage = lazy(() =>
 const DevicePage = lazy(() =>
   import('../../modules/deliveries/DevicePage').then((m) => ({ default: m.DevicePage })),
 );
-const SettingsPage = lazy(() =>
-  import('../../modules/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })),
-);
 const DeliveryPage = lazy(() =>
   import('../../modules/deliveries/DeliveryPage').then((m) => ({ default: m.DeliveryPage })),
 );
@@ -106,7 +103,7 @@ export function AppRouter() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/deliveries" replace />} />
+                <Route index element={<Navigate to="/inventory" replace />} />
                 <Route path="deliveries" element={<DeliveriesPage />} />
                 <Route path="deliveries/new" element={<DeliveryCreatePage />} />
                 <Route path="deliveries/:id" element={<DeliveryPage />} />
@@ -131,15 +128,9 @@ export function AppRouter() {
                     </RoleRoute>
                   }
                 />
-                <Route
-                  path="settings"
-                  element={
-                    <RoleRoute min="admin">
-                      <SettingsPage />
-                    </RoleRoute>
-                  }
-                />
-                <Route path="*" element={<Navigate to="/deliveries" replace />} />
+                {/* Настройки адреса переехали в «Склады» — старые ссылки ведут туда. */}
+                <Route path="settings" element={<Navigate to="/warehouses" replace />} />
+                <Route path="*" element={<Navigate to="/inventory" replace />} />
               </Route>
             </Routes>
           </Suspense>

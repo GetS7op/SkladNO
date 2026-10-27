@@ -1,8 +1,9 @@
-import { ChevronDown, LayoutGrid, Menu, X } from 'lucide-react';
+import { ChevronDown, Eye, LayoutGrid, Menu, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { useMe } from '../auth/context';
-import { navForRole, navItemFromPathname, navSectionFromPathname } from '../router/routes';
+import { useAuth, useRole } from '../auth/context';
+import { roleLabel } from '../domain';
+import { NAV_HOME, navForRole, navItemFromPathname, navSectionFromPathname } from '../router/routes';
 import { UserMenu } from './UserMenu';
 
 const SECTIONS_KEY = 'skladno.nav.sections';
@@ -22,7 +23,8 @@ function loadSections(): Record<string, boolean> {
  * На узком экране (ТСД, телефон) меню свёрнуто в шапку с названием раздела и раскрывается кнопкой.
  */
 export function AppShell({ children }: { children: ReactNode }) {
-  const me = useMe();
+  const role = useRole();
+  const { viewRole, setViewRole } = useAuth();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
   const [sections, setSections] = useState(loadSections);
@@ -66,7 +68,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div className="sidebar-body">
           <nav className="primary-nav">
-            {navForRole(me.role).map(({ title, icon: SectionIcon, items }) => {
+            <NavLink to={NAV_HOME.to} className="nav-item nav-home" onClick={close}>
+              <NAV_HOME.icon size={18} />
+              {NAV_HOME.label}
+            </NavLink>
+            {navForRole(role).map(({ title, icon: SectionIcon, items }) => {
               const active = currentSection?.title === title;
               // Раздел открытой страницы раскрыт, пока его не свернули вручную.
               const expanded = sections[title] ?? active;
@@ -101,7 +107,21 @@ export function AppShell({ children }: { children: ReactNode }) {
           <UserMenu />
         </div>
       </aside>
-      <main className="workspace">{children}</main>
+      <main className="workspace">
+        {viewRole && (
+          <div className="banner view-role-banner no-print">
+            <Eye size={16} />
+            <span>
+              Вид роли «{roleLabel(viewRole)}»: меню и кнопки — как у этой роли. Действия по-прежнему
+              выполняются с правами администратора.
+            </span>
+            <button type="button" className="btn" onClick={() => setViewRole(null)}>
+              Вернуть вид администратора
+            </button>
+          </div>
+        )}
+        {children}
+      </main>
     </div>
   );
 }

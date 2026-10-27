@@ -8,6 +8,9 @@ export type AuthContextValue = {
   retry: () => void;
   needsSetup: boolean;
   user: Me | null;
+  /** Вид другой роли, который включил администратор; null — свой вид. */
+  viewRole: Role | null;
+  setViewRole: (role: Role | null) => void;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,7 +30,20 @@ export function useMe(): Me {
   return user;
 }
 
-/** Есть ли у текущего пользователя роль не ниже `min` (окончательно решает сервер). */
+/**
+ * Роль, с которой показывается интерфейс: своя, а у администратора — выбранная для просмотра.
+ * Влияет только на меню и кнопки; права на сервере остаются правами администратора.
+ */
+export function useRole(): Role {
+  const { viewRole } = useAuth();
+  const me = useMe();
+  return effectiveRole(me.role, viewRole);
+}
+
+export const effectiveRole = (role: Role, viewRole: Role | null): Role =>
+  role === 'admin' && viewRole ? viewRole : role;
+
+/** Есть ли у текущего вида роль не ниже `min` (окончательно решает сервер). */
 export function useCan(min: Role): boolean {
-  return hasRole(useMe().role, min);
+  return hasRole(useRole(), min);
 }

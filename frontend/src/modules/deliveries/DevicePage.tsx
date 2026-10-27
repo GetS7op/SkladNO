@@ -26,7 +26,7 @@ export function DevicePage() {
   return (
     <div className="page">
       <Link to="/inventory" className="back">
-        <ArrowLeft size={16} /> Реестр INDEX
+        <ArrowLeft size={16} /> Главная
       </Link>
       <header className="page-head">
         <div>

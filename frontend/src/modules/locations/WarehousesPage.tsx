@@ -6,6 +6,7 @@ import { useCan } from '../../core/auth/context';
 import { download, formatIndex, formatNumber } from '../../core/ui/format';
 import { ErrorBanner, Field, Modal } from '../../core/ui/ui';
 import { exportUrl } from '../reports/api';
+import { AddressSeparatorCard } from '../settings/AddressSeparatorCard';
 import { maskRange, type Warehouse } from './api';
 import { useCreateWarehouse, useRenameWarehouse, useWarehouses } from './hooks';
 
@@ -113,6 +114,7 @@ export function WarehousesPage() {
           );
         })}
       </div>
+      <AddressSeparatorCard />
       {editing === 'new' && <NewWarehouseForm onClose={() => setEditing(null)} />}
       {editing && editing !== 'new' && <RenameForm warehouse={editing} onClose={() => setEditing(null)} />}
     </div>
