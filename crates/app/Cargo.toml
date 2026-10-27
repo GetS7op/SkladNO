@@ -15,6 +15,7 @@ skladno-deliveries.workspace = true
 skladno-identity.workspace = true
 skladno-locations.workspace = true
 skladno-reports.workspace = true
+skladno-service.workspace = true
 skladno-whitelists.workspace = true
 sqlx.workspace = true
 tokio.workspace = true

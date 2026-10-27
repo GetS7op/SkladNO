@@ -1541,6 +1541,7 @@ dependencies = [
  "skladno-identity",
  "skladno-locations",
  "skladno-reports",
+ "skladno-service",
  "skladno-whitelists",
  "sqlx",
  "tokio",
@@ -1647,6 +1648,19 @@ dependencies = [
  "serde_json",
  "skladno-catalog",
  "skladno-clients",
+ "skladno-core",
+ "sqlx",
+ "uuid",
+]
+
+[[package]]
+name = "skladno-service"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "serde",
+ "serde_json",
  "skladno-core",
  "sqlx",
  "uuid",

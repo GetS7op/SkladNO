@@ -21,6 +21,15 @@ const DeliveriesPage = lazy(() =>
 const DeliveryCreatePage = lazy(() =>
   import('../../modules/deliveries/DeliveryCreatePage').then((m) => ({ default: m.DeliveryCreatePage })),
 );
+const ShipmentsPage = lazy(() =>
+  import('../../modules/service/ShipmentsPage').then((m) => ({ default: m.ShipmentsPage })),
+);
+const PartsPage = lazy(() =>
+  import('../../modules/service/PartsPage').then((m) => ({ default: m.PartsPage })),
+);
+const StatusesPage = lazy(() =>
+  import('../../modules/service/StatusesPage').then((m) => ({ default: m.StatusesPage })),
+);
 const InventoryPage = lazy(() =>
   import('../../modules/deliveries/InventoryPage').then((m) => ({ default: m.InventoryPage })),
 );
@@ -108,6 +117,9 @@ export function AppRouter() {
                 <Route path="deliveries/new" element={<DeliveryCreatePage />} />
                 <Route path="deliveries/:id" element={<DeliveryPage />} />
                 <Route path="inventory" element={<InventoryPage />} />
+                <Route path="shipments" element={<ShipmentsPage />} />
+                <Route path="parts" element={<PartsPage />} />
+                <Route path="statuses" element={<StatusesPage />} />
                 <Route path="inventory/:id" element={<DevicePage />} />
                 <Route path="devices" element={<DevicesPage />} />
                 <Route path="clients" element={<ClientsPage />} />

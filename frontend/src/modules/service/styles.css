@@ -1,0 +1,66 @@
+/* Обслуживание: статусы, отправки, комплектующие */
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.status-pill.muted {
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+.status-change {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.status-change select {
+  flex: 1 1 240px;
+  width: auto;
+}
+.category-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.category-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.category-list li span {
+  flex: 1;
+}
+.table.matrix th,
+.table.matrix td {
+  text-align: center;
+}
+.table.matrix tbody th {
+  text-align: left;
+  position: static;
+}
+.table.matrix input {
+  width: auto;
+  height: auto;
+}
+.table td.wrap {
+  white-space: normal;
+  min-width: 180px;
+}
+.warn-text {
+  color: var(--danger);
+}
+.receipt-line {
+  display: grid;
+  grid-template-columns: 1fr 100px auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.report ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}

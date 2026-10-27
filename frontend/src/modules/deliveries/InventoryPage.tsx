@@ -1,7 +1,7 @@
 import './styles.css';
 import { Download, HelpCircle, Search } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { stageLabel } from '../../core/domain';
 import { ColumnPicker, DataTable } from '../../core/ui/DataTable';
 import { type DataColumn, useTableColumns } from '../../core/ui/tableColumns';
@@ -9,6 +9,7 @@ import { downloadCsv, formatNumber } from '../../core/ui/format';
 import { ErrorBanner, Segmented } from '../../core/ui/ui';
 import { useDebounced } from '../../core/ui/useDebounced';
 import { useWarehouseOptions } from '../locations/hooks';
+import { useShipmentStats, useStatuses } from '../service/hooks';
 import type { InventoryItem } from './api';
 import { useInventory, useInventoryStats } from './hooks';
 
@@ -28,7 +29,8 @@ const COLUMNS: DataColumn<InventoryItem>[] = [
     render: (r) => <b className="mono">{r.device_index}</b>,
   },
   { key: 'device', title: 'Устройство', text: deviceLabel },
-  { key: 'stage', title: 'Этап поставки', text: (r) => stageLabel(r.stage) },
+  { key: 'status', title: 'Статус', text: (r) => r.status_name },
+  { key: 'stage', title: 'Этап поставки', text: (r) => stageLabel(r.stage), defaultHidden: true },
   {
     key: 'mac',
     title: 'MAC-адрес',
@@ -78,11 +80,23 @@ export function InventoryPage() {
   const exact = params.get('x') === '1';
   const destination = params.get('wh') ?? '';
   const placement = params.get('pl') ?? '';
+  const status = params.get('st') ?? '';
+  const statuses = useStatuses();
   const q = useDebounced(search);
   const warehouses = useWarehouseOptions();
   const table = useTableColumns('inventory', COLUMNS);
-  const inventory = useInventory({ q, exact, destination, placement });
+  const inventory = useInventory({ q, exact, destination, placement, status });
   const stats = useInventoryStats(destination);
+  const shipments = useShipmentStats();
+  const byName = (name: string) => statuses.data?.statuses.find((s) => s.name === name);
+  const countOf = (ids: string[]) =>
+    stats.data?.by_status.filter((s) => ids.includes(s.status_id)).reduce((sum, s) => sum + s.devices, 0);
+  // Сводки с главной mf-old: клик по плитке включает фильтр по статусу.
+  const awaiting = byName('На размещение');
+  const repair = byName('Ремонт');
+  const absent = statuses.data?.categories.find((c) => c.name === 'Отсутствует');
+  const absentIds =
+    statuses.data?.statuses.filter((s) => s.category_id === absent?.id).map((s) => s.id) ?? [];
   const rows = inventory.data?.items ?? [];
 
   const setParam = (key: string, value: string) =>
@@ -122,6 +136,36 @@ export function InventoryPage() {
         <Tile label="Позиций устройств" value={stats.data?.models} />
         <Tile label="С MAC-адресом" value={stats.data?.with_mac} />
       </div>
+      <div className="tiles">
+        {awaiting && (
+          <FilterTile
+            label="Ждут размещения"
+            value={countOf([awaiting.id])}
+            active={status === awaiting.id}
+            onClick={() => setParam('st', status === awaiting.id ? '' : awaiting.id)}
+          />
+        )}
+        {repair && (
+          <FilterTile
+            label="В ремонте"
+            value={countOf([repair.id])}
+            active={status === repair.id}
+            onClick={() => setParam('st', status === repair.id ? '' : repair.id)}
+          />
+        )}
+        {absent && (
+          <FilterTile
+            label="Отсутствуют на площадке"
+            value={countOf(absentIds)}
+            active={status === `category:${absent.id}`}
+            onClick={() => setParam('st', status === `category:${absent.id}` ? '' : `category:${absent.id}`)}
+          />
+        )}
+        <Link to="/shipments?open=1" className="tile filter-tile">
+          <span>Не вернулись из отправки</span>
+          <b>{shipments.data?.open ?? '…'}</b>
+        </Link>
+      </div>
 
       <div className="inventory-filters">
         <Segmented
@@ -138,6 +182,25 @@ export function InventoryPage() {
             { value: 'unplaced', label: 'Не размещены' },
           ]}
         />
+        <select
+          value={status}
+          onChange={(e) => setParam('st', e.target.value)}
+          aria-label="Статус"
+          className="status-filter"
+        >
+          <option value="">Все статусы</option>
+          <option value="none">Без статуса</option>
+          {statuses.data?.categories.map((c) => (
+            <option key={c.id} value={`category:${c.id}`}>
+              Категория: {c.name}
+            </option>
+          ))}
+          {statuses.data?.statuses.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="inventory-search">
@@ -212,6 +275,30 @@ export function InventoryPage() {
         устройства
       </p>
     </div>
+  );
+}
+
+function FilterTile({
+  label,
+  value,
+  active,
+  onClick,
+}: {
+  label: string;
+  value?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`tile filter-tile${active ? ' active' : ''}`}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      <span>{label}</span>
+      <b>{value === undefined ? '…' : value.toLocaleString('ru-RU')}</b>
+    </button>
   );
 }
 

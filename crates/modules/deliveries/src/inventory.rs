@@ -34,6 +34,7 @@ const SELECT: &str = "SELECT v.id, v.device_index, v.mac_address, v.serial_no, v
     (SELECT w.name FROM warehouses w WHERE w.code = v.destination) AS destination_name, \
     m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client_name, \
     d.id AS delivery_id, d.number AS delivery_number, d.delivery_date, d.stage, \
+    v.status_id, (SELECT s.name FROM device_statuses s WHERE s.id = v.status_id) AS status_name, \
     skladno_address(md.number, mc.number, p.rack, p.shelf) AS location \
     FROM devices v JOIN device_models m ON m.id = v.model_id JOIN deliveries d ON d.id = v.delivery_id \
     JOIN clients c ON c.id = d.client_id LEFT JOIN device_placements p ON p.device_id = v.id \
@@ -60,6 +61,8 @@ pub struct InventoryItem {
     delivery_number: String,
     delivery_date: NaiveDate,
     stage: String,
+    status_id: Option<Uuid>,
+    status_name: Option<String>,
     location: Option<String>,
 }
 
@@ -72,6 +75,8 @@ pub struct ListQuery {
     destination: Option<String>,
     /// placed | unplaced
     placement: Option<String>,
+    /// Статус устройства; «none» — без статуса, «category:<id>» — любой статус категории.
+    status: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -96,6 +101,22 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, query: &ListQuery, search: 
             qb.push(" AND p.device_id IS NULL");
         }
         _ => {}
+    }
+    match query.status.as_deref() {
+        Some("none") => {
+            qb.push(" AND v.status_id IS NULL");
+        }
+        // «category:<id>» — все статусы категории (например, «Отсутствует»).
+        Some(value) => {
+            if let Some(Ok(category)) = value.strip_prefix("category:").map(str::parse::<Uuid>) {
+                qb.push(" AND v.status_id IN (SELECT id FROM device_statuses WHERE category_id = ")
+                    .push_bind(category)
+                    .push(")");
+            } else if let Ok(id) = value.parse::<Uuid>() {
+                qb.push(" AND v.status_id = ").push_bind(id);
+            }
+        }
+        None => {}
     }
     if search.is_empty() {
         return;
@@ -178,9 +199,9 @@ pub struct StatsQuery {
     destination: Option<String>,
 }
 
-/// Плитки над реестром: как на складе mf-old.
+/// Плитки над реестром: как на складе и главной mf-old.
 #[derive(Debug, Serialize, sqlx::FromRow)]
-pub struct InventoryStats {
+pub struct InventoryCounts {
     devices: i64,
     clients: i64,
     models: i64,
@@ -188,21 +209,43 @@ pub struct InventoryStats {
     placed: i64,
 }
 
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct StatusCount {
+    status_id: Uuid,
+    devices: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InventoryStats {
+    #[serde(flatten)]
+    counts: InventoryCounts,
+    /// Сколько устройств в каждом статусе — для плиток «Ждут размещения», «В ремонте», «Отсутствуют».
+    by_status: Vec<StatusCount>,
+}
+
 async fn stats(
     State(db): State<Db>,
     Query(query): Query<StatsQuery>,
 ) -> AppResult<Json<InventoryStats>> {
-    let row = sqlx::query_as::<_, InventoryStats>(
+    let destination = text::clean(query.destination);
+    let counts = sqlx::query_as::<_, InventoryCounts>(
         "SELECT count(*) AS devices, count(DISTINCT d.client_id) AS clients, count(DISTINCT v.model_id) AS models, \
          count(v.mac_address) AS with_mac, count(p.device_id) AS placed \
          FROM devices v JOIN deliveries d ON d.id = v.delivery_id \
          LEFT JOIN device_placements p ON p.device_id = v.id \
          WHERE ($1::text IS NULL OR v.destination = $1)",
     )
-    .bind(text::clean(query.destination))
+    .bind(&destination)
     .fetch_one(&db)
     .await?;
-    Ok(Json(row))
+    let by_status = sqlx::query_as::<_, StatusCount>(
+        "SELECT v.status_id, count(*) AS devices FROM devices v \
+         WHERE v.status_id IS NOT NULL AND ($1::text IS NULL OR v.destination = $1) GROUP BY v.status_id",
+    )
+    .bind(&destination)
+    .fetch_all(&db)
+    .await?;
+    Ok(Json(InventoryStats { counts, by_status }))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]

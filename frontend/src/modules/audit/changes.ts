@@ -1,22 +1,26 @@
 import { type Role, roleLabel } from '../../core/domain';
-import { formatDateTime } from '../../core/ui/format';
+import { formatDate, formatDateTime } from '../../core/ui/format';
 
 const ISO_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Поля записи журнала одним списком: вложенный объект (например, профиль нового пользователя)
  * раскрывается в отдельные поля, пара «было/стало» остаётся парой.
  */
 export function flattenChanges(changes: Record<string, unknown>, hidden: Set<string>): [string, unknown][] {
-  return Object.entries(changes)
-    .filter(([key]) => !hidden.has(key))
-    .flatMap(([key, value]): [string, unknown][] => {
-      const nested =
-        value && typeof value === 'object' && !Array.isArray(value) && !('old' in value && 'new' in value);
-      return nested
-        ? Object.entries(value as Record<string, unknown>).filter(([k, v]) => !hidden.has(k) && v !== null)
-        : [[key, value]];
-    });
+  return (
+    Object.entries(changes)
+      // Пустые поля в записи о создании ничего не говорят — их не показываем.
+      .filter(([key, value]) => !hidden.has(key) && value !== null)
+      .flatMap(([key, value]): [string, unknown][] => {
+        const nested =
+          value && typeof value === 'object' && !Array.isArray(value) && !('old' in value && 'new' in value);
+        return nested
+          ? Object.entries(value as Record<string, unknown>).filter(([k, v]) => !hidden.has(k) && v !== null)
+          : [[key, value]];
+      })
+  );
 }
 
 /** Значения, которые сами по себе непонятны: роли и метки времени. */
@@ -34,5 +38,6 @@ export function renderValue(value: unknown, label?: (value: string) => string): 
   if (Array.isArray(value)) return value.map((v) => renderValue(v, label)).join(', ');
   const text = String(value);
   if (label) return label(text);
-  return ISO_DATETIME.test(text) ? formatDateTime(text) : text;
+  if (ISO_DATETIME.test(text)) return formatDateTime(text);
+  return ISO_DATE.test(text) ? formatDate(text) : text;
 }

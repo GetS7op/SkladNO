@@ -15,6 +15,10 @@ describe('flattenChanges', () => {
     ]);
   });
 
+  it('не показывает пустые поля', () => {
+    expect(flattenChanges({ note: null, quantity: 3 }, new Set())).toEqual([['quantity', 3]]);
+  });
+
   it('оставляет пару «было/стало» целой', () => {
     expect(flattenChanges({ active: { old: true, new: false } }, new Set())).toEqual([
       ['active', { old: true, new: false }],
@@ -26,6 +30,7 @@ describe('renderValue', () => {
   it('показывает роль названием, а время — по-русски', () => {
     expect(renderValue('operator', BUILTIN_VALUE_LABELS.role)).toBe('СА');
     expect(renderValue('2026-10-28T04:19:34.277717378Z')).not.toContain('T04');
+    expect(renderValue('2026-10-27')).toBe('27.10.2026');
   });
 
   it('пары, флаги и списки', () => {

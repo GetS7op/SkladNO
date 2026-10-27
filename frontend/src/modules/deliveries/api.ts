@@ -134,6 +134,8 @@ const inventoryItemSchema = z.object({
   delivery_number: z.string(),
   delivery_date: z.string(),
   stage: stageSchema,
+  status_id: z.string().nullable(),
+  status_name: z.string().nullable(),
   location: z.string().nullable(),
 });
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
@@ -152,6 +154,7 @@ const inventoryStatsSchema = z.object({
   models: z.number().int(),
   with_mac: z.number().int(),
   placed: z.number().int(),
+  by_status: z.array(z.object({ status_id: z.string(), devices: z.number().int() })),
 });
 
 /** Карточка устройства: данные и история изменений (когда, кто, было → стало). */
@@ -168,7 +171,13 @@ const deviceCardSchema = inventoryItemSchema.extend({
 });
 export type DeviceCard = z.infer<typeof deviceCardSchema>;
 
-export type InventoryParams = { q: string; exact: boolean; destination: string; placement: string };
+export type InventoryParams = {
+  q: string;
+  exact: boolean;
+  destination: string;
+  placement: string;
+  status: string;
+};
 
 export const listInventory = (params: InventoryParams) =>
   apiGet(withQuery('/inventory', params), inventoryListSchema);

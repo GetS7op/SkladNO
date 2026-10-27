@@ -49,7 +49,7 @@ fn tally<'a>(prefix: &str, values: impl Iterator<Item = &'a str>) -> Vec<(String
         .collect()
 }
 
-pub const NAMES: [&str; 8] = [
+pub const NAMES: [&str; 10] = [
     "devices",
     "inventory",
     "clients",
@@ -58,6 +58,8 @@ pub const NAMES: [&str; 8] = [
     "workers",
     "containers",
     "modules",
+    "shipments",
+    "parts",
 ];
 
 pub async fn build(db: &Db, name: &str) -> AppResult<Option<Table>> {
@@ -70,6 +72,8 @@ pub async fn build(db: &Db, name: &str) -> AppResult<Option<Table>> {
         "workers" => workers(db).await?,
         "containers" => containers(db).await?,
         "modules" => modules(db).await?,
+        "shipments" => shipments(db).await?,
+        "parts" => parts(db).await?,
         _ => return Ok(None),
     }))
 }
@@ -154,6 +158,7 @@ struct InventoryRow {
     delivery_date: NaiveDate,
     destination: String,
     stage: String,
+    status: Option<String>,
     location: Option<String>,
     mac_address: Option<String>,
     serial_no: Option<String>,
@@ -164,6 +169,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     let rows = sqlx::query_as::<_, InventoryRow>(
         "SELECT v.device_index, v.id, m.manufacturer, m.model, m.hashrate_ths, m.power_w, c.name AS client, \
          d.number, d.delivery_date, (SELECT w.name FROM warehouses w WHERE w.code = v.destination) AS destination, d.stage, \
+         (SELECT s.name FROM device_statuses s WHERE s.id = v.status_id) AS status, \
          skladno_address(md.number, mc.number, p.rack, p.shelf) AS location, \
          v.mac_address, v.serial_no \
          FROM devices v JOIN device_models m ON m.id = v.model_id JOIN deliveries d ON d.id = v.delivery_id \
@@ -194,6 +200,11 @@ async fn inventory(db: &Db) -> AppResult<Table> {
     stats.extend(tally("Склад", rows.iter().map(|r| r.destination.as_str())));
     stats.extend(tally("Клиент", rows.iter().map(|r| r.client.as_str())));
     stats.extend(tally("Модель", rows.iter().map(|r| r.model.as_str())));
+    stats.extend(tally(
+        "Статус",
+        rows.iter()
+            .map(|r| r.status.as_deref().unwrap_or("без статуса")),
+    ));
     Ok(Table {
         title: "Реестр устройств".into(),
         file: "inventory".into(),
@@ -209,6 +220,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
             "Дата поставки",
             "Склад",
             "Этап поставки",
+            "Статус",
             "Место",
             "MAC",
             "Серийный номер",
@@ -228,6 +240,7 @@ async fn inventory(db: &Db) -> AppResult<Table> {
                     date(r.delivery_date),
                     r.destination.into(),
                     stage(&r.stage).into(),
+                    r.status.into(),
                     r.location.into(),
                     r.mac_address.into(),
                     r.serial_no.into(),
@@ -602,6 +615,148 @@ async fn modules(db: &Db) -> AppResult<Table> {
                     r.capacity.into(),
                     r.placed.into(),
                     (r.capacity - r.placed).into(),
+                ]
+            })
+            .collect(),
+        stats,
+    })
+}
+
+#[derive(sqlx::FromRow)]
+struct ShipmentRow {
+    device_index: String,
+    device: String,
+    client: String,
+    recipient: Option<String>,
+    packed_at: Option<NaiveDate>,
+    shipped_at: Option<NaiveDate>,
+    arrived_at: Option<NaiveDate>,
+    status: Option<String>,
+    comment: Option<String>,
+    repair_note: Option<String>,
+}
+
+async fn shipments(db: &Db) -> AppResult<Table> {
+    let rows = sqlx::query_as::<_, ShipmentRow>(
+        "SELECT v.device_index, m.manufacturer || ' ' || m.model AS device, c.name AS client, s.recipient, \
+         s.packed_at, s.shipped_at, s.arrived_at, st.name AS status, s.comment, s.repair_note \
+         FROM shipments s JOIN devices v ON v.id = s.device_id JOIN device_models m ON m.id = v.model_id \
+         JOIN deliveries d ON d.id = v.delivery_id JOIN clients c ON c.id = d.client_id \
+         LEFT JOIN device_statuses st ON st.id = v.status_id \
+         ORDER BY COALESCE(s.shipped_at, s.packed_at, s.arrived_at) DESC, v.device_index",
+    )
+    .fetch_all(db)
+    .await?;
+    let open = rows.iter().filter(|r| r.arrived_at.is_none()).count() as i64;
+    let mut stats = vec![
+        ("Отправок".to_string(), (rows.len() as i64).into()),
+        ("Не вернулись".to_string(), open.into()),
+    ];
+    stats.extend(tally(
+        "Кому",
+        rows.iter().map(|r| r.recipient.as_deref().unwrap_or("—")),
+    ));
+    let optional_date = |d: Option<NaiveDate>| d.map(date).unwrap_or(Cell::Empty);
+    Ok(Table {
+        title: "Отправки".into(),
+        file: "shipments".into(),
+        columns: vec![
+            "INDEX",
+            "Устройство",
+            "Клиент",
+            "Кому",
+            "Упакован",
+            "Отправлен",
+            "Прибыл",
+            "Статус",
+            "Комментарий",
+            "Результат ремонта",
+        ],
+        rows: rows
+            .into_iter()
+            .map(|r| {
+                vec![
+                    r.device_index.into(),
+                    r.device.into(),
+                    r.client.into(),
+                    r.recipient.into(),
+                    optional_date(r.packed_at),
+                    optional_date(r.shipped_at),
+                    optional_date(r.arrived_at),
+                    r.status.into(),
+                    r.comment.into(),
+                    r.repair_note.into(),
+                ]
+            })
+            .collect(),
+        stats,
+    })
+}
+
+#[derive(sqlx::FromRow)]
+struct PartRow {
+    name: String,
+    part_type: Option<String>,
+    received: i64,
+    installed: i64,
+    removed: i64,
+    written_off: i64,
+    note: Option<String>,
+}
+
+async fn parts(db: &Db) -> AppResult<Table> {
+    let rows = sqlx::query_as::<_, PartRow>(
+        "SELECT p.name, t.name AS part_type, \
+         COALESCE((SELECT sum(l.quantity) FROM part_receipt_lines l WHERE l.part_id = p.id), 0)::bigint AS received, \
+         COALESCE((SELECT sum(x.quantity) FROM part_movements x WHERE x.part_id = p.id AND x.action = 'installed'), 0)::bigint AS installed, \
+         COALESCE((SELECT sum(x.quantity) FROM part_movements x WHERE x.part_id = p.id AND x.action = 'removed'), 0)::bigint AS removed, \
+         COALESCE((SELECT sum(x.quantity) FROM part_movements x WHERE x.part_id = p.id AND x.action = 'written_off'), 0)::bigint AS written_off, \
+         p.note FROM parts p LEFT JOIN part_types t ON t.id = p.part_type_id ORDER BY t.name NULLS LAST, p.name",
+    )
+    .fetch_all(db)
+    .await?;
+    let available = |r: &PartRow| r.received - r.installed + r.removed - r.written_off;
+    let stats = vec![
+        ("Позиций".to_string(), (rows.len() as i64).into()),
+        (
+            "На складе, шт.".to_string(),
+            rows.iter().map(available).sum::<i64>().into(),
+        ),
+        (
+            "Установлено, шт.".to_string(),
+            rows.iter().map(|r| r.installed).sum::<i64>().into(),
+        ),
+        (
+            "Позиций без остатка".to_string(),
+            (rows.iter().filter(|r| available(r) <= 0).count() as i64).into(),
+        ),
+    ];
+    Ok(Table {
+        title: "Комплектующие".into(),
+        file: "parts".into(),
+        columns: vec![
+            "Позиция",
+            "Тип",
+            "Приход",
+            "Установлено",
+            "Снято",
+            "Списано",
+            "На складе",
+            "Примечание",
+        ],
+        rows: rows
+            .into_iter()
+            .map(|r| {
+                let left = available(&r);
+                vec![
+                    r.name.into(),
+                    r.part_type.into(),
+                    r.received.into(),
+                    r.installed.into(),
+                    r.removed.into(),
+                    r.written_off.into(),
+                    left.into(),
+                    r.note.into(),
                 ]
             })
             .collect(),

@@ -148,14 +148,44 @@ check "адрес с новым разделителем" "1-1-1-1" "$(body '.it
 check "старый штрихкод с X читается" 409 "$(place "$JAR" 2X1X1X1 0000002)"
 call "$JAR" PUT /settings '{"address_separator":"X"}' >/dev/null
 
+echo "== Статусы, отправки, комплектующие"
+call "$JAR" GET /statuses >/dev/null
+check "справочник статусов из mf-old" "8 16" "$(body '"\(.statuses | length) \(.transitions | length)"')"
+st() { jq -r --arg n "$1" '.statuses[] | select(.name == $n) | .id' "$WORK/statuses.json"; }
+cp "$WORK/body" "$WORK/statuses.json"
+check "СА ставит первый статус" 200 "$(call "$OP_JAR" PUT "/inventory/$DEV1/status" "{\"status_id\":\"$(st 'В работе')\"}")"
+check "СА — по матрице" 200 "$(call "$OP_JAR" PUT "/inventory/$DEV1/status" "{\"status_id\":\"$(st 'Требует ТО')\"}")"
+check "СА — вне матрицы нельзя" 409 "$(call "$OP_JAR" PUT "/inventory/$DEV1/status" "{\"status_id\":\"$(st 'Донор')\"}")"
+check "Старший СА — вне матрицы можно" 200 "$(call "$JAR" PUT "/inventory/$DEV1/status" "{\"status_id\":\"$(st 'Донор')\"}")"
+check "отметка «вне матрицы»" "true" "$(body .outside_matrix)"
+check "отправка устройств 1-2" 201 "$(call "$OP_JAR" POST /shipments '{"devices":"1-2","recipient":"Bitkern","packed_at":"2026-10-20","comment":"Ошибка J2:2"}')"
+check "записаны обе" "0000001 0000002" "$(body '.created | join(" ")')"
+call "$OP_JAR" POST /shipments '{"devices":"2","packed_at":"2026-10-21"}' >/dev/null
+check "повторно упаковать нельзя" "0000002" "$(body '.blocked[0].device_index')"
+call "$JAR" GET '/inventory?q=1' >/dev/null
+check "упаковка ставит статус «Упакован»" "Упакован" "$(body '.items[0].status_name')"
+call "$JAR" GET '/shipments?q=0000001' >/dev/null
+SHIP=$(body '.[0].id')
+call "$OP_JAR" PUT "/shipments/$SHIP" '{"recipient":"Bitkern","packed_at":"2026-10-20","shipped_at":"2026-10-22","arrived_at":"2026-10-26"}' >/dev/null
+check "прибытие ставит «Ремонт»" "Ремонт" "$(body .shipment.status_name)"
+call "$JAR" GET /shipments/stats >/dev/null
+check "отправок и не вернулись" "2 1" "$(body '"\(.total) \(.open)"')"
+check "позиция комплектующих" 201 "$(call "$JAR" POST /parts '{"name":"APW171215A"}')"
+PART=$(body .id)
+check "СА не заводит позиции — 403" 403 "$(call "$OP_JAR" POST /parts '{"name":"FAN-1"}')"
+check "приход 5 шт." 204 "$(call "$OP_JAR" POST /part-receipts "{\"received_at\":\"2026-10-25\",\"lines\":[{\"part_id\":\"$PART\",\"quantity\":5}]}")"
+check "установка 2 шт. в 0000001" 201 "$(call "$OP_JAR" POST /part-movements "{\"part_id\":\"$PART\",\"action\":\"installed\",\"quantity\":2,\"device_index\":\"1\"}")"
+check "остаток 3" "3" "$(body .available)"
+check "списать больше остатка нельзя" 409 "$(call "$OP_JAR" POST /part-movements "{\"part_id\":\"$PART\",\"action\":\"written_off\",\"quantity\":4}")"
+
 echo "== Экспорт"
-for registry in devices inventory clients deliveries pools workers containers modules; do
+for registry in devices inventory clients deliveries pools workers containers modules shipments parts; do
   for format in csv xlsx md; do
     code=$(curl -s -b "$JAR" -o /dev/null -w '%{http_code}' "$API/export/$registry?format=$format")
     [ "$code" = 200 ] || fail "экспорт $registry.$format: $code"
   done
 done
-ok "8 реестров × 3 формата"
+ok "10 реестров × 3 формата"
 
 echo
 if [ "$FAILED" -eq 0 ]; then echo "Все проверки пройдены"; else echo "Провалено проверок: $FAILED"; fi

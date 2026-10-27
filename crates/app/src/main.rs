@@ -52,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(skladno_locations::router())
         .merge(skladno_identity::router())
         .merge(skladno_reports::router())
+        .merge(skladno_service::router())
         .route_layer(axum::middleware::from_fn_with_state(
             db.clone(),
             access::guard,

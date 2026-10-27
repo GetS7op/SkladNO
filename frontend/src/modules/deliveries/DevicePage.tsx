@@ -6,6 +6,7 @@ import { useCan } from '../../core/auth/context';
 import { formatDate, formatDateTime, formatNumber } from '../../core/ui/format';
 import { ErrorBanner, Field, Modal } from '../../core/ui/ui';
 import { AuditList } from '../audit/AuditPage';
+import { DeviceServiceHistory, DeviceStatusCard } from '../service/DeviceService';
 import type { DeviceCard } from './api';
 import { useDevice, useUpdateDevice } from './hooks';
 import { StageBadge } from './StageBadge';
@@ -81,6 +82,9 @@ export function DevicePage() {
           <dd>{formatDateTime(d.created_at)}</dd>
         </dl>
       </section>
+
+      <DeviceStatusCard deviceId={d.id} statusId={d.status_id} />
+      <DeviceServiceHistory deviceId={d.id} />
 
       <section className="card">
         <h2>История устройства</h2>

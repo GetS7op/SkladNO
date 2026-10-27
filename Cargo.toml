@@ -8,6 +8,7 @@ members = [
     "crates/modules/identity",
     "crates/modules/locations",
     "crates/modules/reports",
+    "crates/modules/service",
     "crates/modules/whitelists",
 ]
 resolver = "3"
@@ -38,5 +39,6 @@ skladno-clients = { path = "crates/modules/clients" }
 skladno-deliveries = { path = "crates/modules/deliveries" }
 skladno-identity = { path = "crates/modules/identity" }
 skladno-locations = { path = "crates/modules/locations" }
+skladno-service = { path = "crates/modules/service" }
 skladno-reports = { path = "crates/modules/reports" }
 skladno-whitelists = { path = "crates/modules/whitelists" }

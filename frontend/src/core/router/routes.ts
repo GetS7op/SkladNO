@@ -12,9 +12,12 @@ import {
   Settings,
   Settings2,
   SlidersHorizontal,
+  Tags,
+  Truck,
   ShieldCheck,
   Users,
   Warehouse,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { hasRole, type Role } from '../domain';
@@ -37,7 +40,11 @@ export const NAV: NavSection[] = [
   {
     title: 'Учёт',
     icon: ClipboardList,
-    items: [{ to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' }],
+    items: [
+      { to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' },
+      { to: '/shipments', label: 'Отправки', icon: Truck, minRole: 'operator' },
+      { to: '/parts', label: 'Комплектующие', icon: Wrench, minRole: 'operator' },
+    ],
   },
   {
     title: 'Преднастройки',
@@ -57,6 +64,7 @@ export const NAV: NavSection[] = [
       { to: '/containers', label: 'Контейнеры', icon: Container, minRole: 'operator' },
       { to: '/devices', label: 'Устройства', icon: Cpu, minRole: 'operator' },
       { to: '/clients', label: 'Клиенты', icon: Users, minRole: 'operator' },
+      { to: '/statuses', label: 'Статусы', icon: Tags, minRole: 'operator' },
       { to: '/users', label: 'Пользователи', icon: ShieldCheck, minRole: 'admin' },
     ],
   },

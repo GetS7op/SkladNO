@@ -34,10 +34,16 @@ fn required_role(method: &Method, path: &str) -> Option<Role> {
     if method == Method::PUT && path.starts_with("/inventory/") {
         return Some(Role::Operator);
     }
+    // Отправки: создание и правка дат — работа СА.
+    if path == "/shipments" || (method == Method::PUT && path.starts_with("/shipments/")) {
+        return Some(Role::Operator);
+    }
     match path {
         // Работа СА: создание поставки, файлы документа, данные устройств, приём, смена этапа
-        // (дальше этап проверяет обработчик).
-        "/deliveries" | "/placements" => Some(Role::Operator),
+        // (дальше этап проверяет обработчик), приход и движение комплектующих.
+        "/deliveries" | "/placements" | "/part-receipts" | "/part-movements" => {
+            Some(Role::Operator)
+        }
         _ if is_delivery_advance || is_delivery_file => Some(Role::Operator),
         // Остальные изменения — справочники и места: Старший СА.
         _ => Some(Role::Senior),
@@ -77,6 +83,22 @@ mod tests {
         assert_eq!(required_role(&post, "/auth/login"), None);
         assert_eq!(required_role(&get, "/devices"), Some(Role::Operator));
         assert_eq!(required_role(&get, "/warehouses"), Some(Role::Operator));
+        assert_eq!(
+            required_role(&put, "/inventory/x/status"),
+            Some(Role::Operator)
+        );
+        assert_eq!(required_role(&post, "/shipments"), Some(Role::Operator));
+        assert_eq!(required_role(&put, "/shipments/x"), Some(Role::Operator));
+        assert_eq!(
+            required_role(&post, "/part-movements"),
+            Some(Role::Operator)
+        );
+        assert_eq!(required_role(&post, "/statuses"), Some(Role::Senior));
+        assert_eq!(
+            required_role(&put, "/status-transitions"),
+            Some(Role::Senior)
+        );
+        assert_eq!(required_role(&post, "/parts"), Some(Role::Senior));
         assert_eq!(required_role(&post, "/warehouses"), Some(Role::Admin));
         assert_eq!(required_role(&put, "/warehouses/w1"), Some(Role::Admin));
         assert_eq!(required_role(&post, "/deliveries"), Some(Role::Operator));

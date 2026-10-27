@@ -3,7 +3,16 @@ import { apiUpload, apiUrl, withQuery } from '../../core/api/client';
 
 /** Реестры, которые выгружаются в XLSX / CSV / MD (SPEC: импорт и экспорт). */
 export type ExportRegistry =
-  'devices' | 'inventory' | 'clients' | 'deliveries' | 'pools' | 'workers' | 'containers' | 'modules';
+  | 'devices'
+  | 'inventory'
+  | 'clients'
+  | 'deliveries'
+  | 'pools'
+  | 'workers'
+  | 'containers'
+  | 'modules'
+  | 'shipments'
+  | 'parts';
 
 export type ExportFormat = 'xlsx' | 'csv' | 'md';
 

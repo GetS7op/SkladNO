@@ -20,6 +20,12 @@ const ENTITY_LABELS: Record<string, string> = {
   user: 'Пользователь',
   invite: 'Приглашение',
   settings: 'Настройки',
+  status: 'Статус',
+  status_category: 'Категория статусов',
+  status_transitions: 'Матрица статусов',
+  part: 'Комплектующие',
+  part_type: 'Тип комплектующих',
+  part_receipt: 'Приход комплектующих',
   warehouse: 'Склад',
 };
 
@@ -36,6 +42,11 @@ const ACTION_LABELS: Record<string, string> = {
   password: 'смена пароля',
   reset_password: 'сброс пароля',
   revoke: 'отзыв',
+  status: 'смена статуса',
+  shipment: 'отправка',
+  shipment_update: 'изменение отправки',
+  part: 'комплектующие',
+  written_off: 'списание',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -95,9 +106,24 @@ const FIELD_LABELS: Record<string, string> = {
   email: 'Почта',
   telegram: 'Telegram',
   expires_at: 'Действует до',
+  status: 'Статус',
+  outside_matrix: 'Вне матрицы',
+  source: 'Причина',
+  recipient: 'Кому',
+  packed_at: 'Упакован',
+  shipped_at: 'Отправлен',
+  arrived_at: 'Прибыл',
+  comment: 'Комментарий',
+  repair_note: 'Результат ремонта',
+  part: 'Позиция',
+  movement: 'Действие',
+  quantity: 'Количество',
+  transitions: 'Переходов',
+  received_at: 'Дата прихода',
+  lines: 'Позиций',
 };
 
-const HIDDEN = new Set(['id', 'client_id', 'pool_id']);
+const HIDDEN = new Set(['id', 'client_id', 'pool_id', 'shipment']);
 
 /** Журнал действий: когда, кто и что сделал; для изменений — старое и новое значение. */
 export function AuditPage() {
@@ -121,6 +147,8 @@ export function AuditPage() {
             { value: 'device_model', label: 'Модели' },
             { value: 'client', label: 'Клиенты' },
             { value: 'warehouse', label: 'Склады' },
+            { value: 'status', label: 'Статусы' },
+            { value: 'part', label: 'Комплектующие' },
             { value: 'module', label: 'Модули' },
             { value: 'container', label: 'Контейнеры' },
             { value: 'pool', label: 'Пулы' },
