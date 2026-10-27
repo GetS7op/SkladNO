@@ -469,6 +469,54 @@ textarea:focus {
 .table tbody tr:last-child td {
   border-bottom: 0;
 }
+/* Таблица с выбором столбцов и сортировкой (DataTable) */
+.data-table {
+  overflow: auto;
+}
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.column-picker {
+  position: relative;
+}
+.column-picker summary {
+  list-style: none;
+}
+.column-picker summary::-webkit-details-marker {
+  display: none;
+}
+.column-menu {
+  position: absolute;
+  left: 0;
+  max-width: calc(100vw - 32px);
+  z-index: 30;
+  display: grid;
+  gap: 6px;
+  min-width: 230px;
+  margin-top: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+}
+.column-menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.column-menu input {
+  width: auto;
+  height: auto;
+}
 .table tr.clickable {
   cursor: pointer;
 }

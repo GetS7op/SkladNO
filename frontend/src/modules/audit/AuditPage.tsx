@@ -5,6 +5,7 @@ import { formatDateTime } from '../../core/ui/format';
 import { Segmented } from '../../core/ui/ui';
 import { useWarehouseName } from '../locations/hooks';
 import type { AuditEntry } from './api';
+import { BUILTIN_VALUE_LABELS, flattenChanges, renderValue } from './changes';
 import { useAudit } from './hooks';
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -87,6 +88,13 @@ const FIELD_LABELS: Record<string, string> = {
   size: 'Размер, байт',
   role: 'Роль',
   active: 'Активен',
+  login: 'Логин',
+  last_name: 'Фамилия',
+  first_name: 'Имя',
+  middle_name: 'Отчество',
+  email: 'Почта',
+  telegram: 'Telegram',
+  expires_at: 'Действует до',
 };
 
 const HIDDEN = new Set(['id', 'client_id', 'pool_id']);
@@ -158,11 +166,12 @@ export function AuditList({
 
 function Changes({ entry }: { entry: AuditEntry }) {
   const warehouseName = useWarehouseName();
-  const items = Object.entries(entry.changes ?? {}).filter(([k]) => !HIDDEN.has(k));
+  const items = flattenChanges(entry.changes ?? {}, HIDDEN);
   if (items.length === 0) return null;
   // Склад в журнале хранится кодом — показываем имя из справочника складов.
   const labels: Record<string, (value: string) => string> = {
     ...VALUE_LABELS,
+    ...BUILTIN_VALUE_LABELS,
     destination: warehouseName,
     warehouse: warehouseName,
   };
@@ -180,13 +189,3 @@ function Changes({ entry }: { entry: AuditEntry }) {
 const VALUE_LABELS: Record<string, (value: string) => string> = {
   stage: (v) => stageLabel(v as Stage),
 };
-
-function renderValue(value: unknown, label?: (value: string) => string): string {
-  if (value && typeof value === 'object' && 'old' in value && 'new' in value) {
-    const v = value as { old: unknown; new: unknown };
-    return `${renderValue(v.old, label)} → ${renderValue(v.new, label)}`;
-  }
-  if (value === null || value === undefined) return '—';
-  if (typeof value === 'boolean') return value ? 'да' : 'нет';
-  return label ? label(String(value)) : String(value);
-}

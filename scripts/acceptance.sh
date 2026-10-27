@@ -130,8 +130,15 @@ check "Старший СА / администратор правит" 200 "$(cal
 check "MAC нормализован" "AA:BB:CC:00:00:01" "$(body .mac_address)"
 
 echo "== Реестр INDEX, журнал, настройки"
-call "$JAR" GET '/inventory?q=AA:BB:CC:00:00:01' >/dev/null
-check "поиск по MAC" "0000001" "$(body '.items[0].device_index')"
+call "$JAR" GET '/inventory?q=aabbcc000001' >/dev/null
+check "поиск по MAC в любом написании" "0000001" "$(body '.items[0].device_index')"
+call "$JAR" GET '/inventory?q=1-2%209000000' >/dev/null
+check "диапазон и номер сразу" "0000001 0000002 9000000" "$(body '[.items[].device_index] | join(" ")')"
+check "что понял поиск" "номера 0000001–0000002, 9000000" "$(body .summary)"
+call "$JAR" GET '/inventory?q=1-3,%20SN1&exact=true' >/dev/null
+check "точное совпадение — все критерии" "0000001" "$(body '[.items[].device_index] | join(" ")')"
+call "$JAR" GET '/inventory/stats' >/dev/null
+check "плитки: устройств и с MAC" "6 1" "$(body '"\(.devices) \(.with_mac)"')"
 call "$JAR" GET "/inventory/$DEV1" >/dev/null
 check "история устройства: размещение и правка" "true" "$(body '(.history | length) >= 2')"
 check "СА не меняет настройки — 403" 403 "$(call "$OP_JAR" PUT /settings '{"address_separator":"-"}')"

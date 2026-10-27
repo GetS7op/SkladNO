@@ -1,4 +1,5 @@
-//! Реестр INDEX: все физические устройства из всех поставок — поиск, карточка с историей
+//! Реестр INDEX («Главная»): все физические устройства из всех поставок — поиск по критериям
+//! как в mf-old (номера, диапазоны, MAC, текст), сводка для плиток, карточка с историей
 //! изменений (SPEC: для устройств «когда, что изменилось, старое и новое значение») и правка
 //! MAC и серийного номера.
 
@@ -13,15 +14,19 @@ use serde_json::json;
 use skladno_core::{
     AppError, AppResult, Db, audit,
     auth::{self, Role},
+    search::{Criterion, DeviceSearch},
     text::{self, normalize_mac},
 };
+use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
-const PAGE_MAX: i64 = 200;
+/// Все найденные строки отдаются разом, как в mf-old; предел защищает от случайной выгрузки миллиона.
+const ROWS_MAX: i64 = 50_000;
 
 pub fn router() -> Router<Db> {
     Router::new()
         .route("/inventory", get(list))
+        .route("/inventory/stats", get(stats))
         .route("/inventory/{id}", get(detail).put(update))
 }
 
@@ -34,11 +39,9 @@ const SELECT: &str = "SELECT v.id, v.device_index, v.mac_address, v.serial_no, v
     JOIN clients c ON c.id = d.client_id LEFT JOIN device_placements p ON p.device_id = v.id \
     LEFT JOIN module_containers mc ON mc.id = p.module_container_id LEFT JOIN modules md ON md.id = mc.module_id";
 
-/// Фильтры реестра: поиск по INDEX, MAC, серийному, модели, клиенту и поставке.
-const WHERE: &str = "WHERE ($1::text IS NULL OR v.device_index ILIKE $1 OR v.mac_address ILIKE $1 \
-       OR v.serial_no ILIKE $1 OR m.model ILIKE $1 OR m.manufacturer ILIKE $1 OR c.name ILIKE $1 OR d.number ILIKE $1) \
-    AND ($2::text IS NULL OR v.destination = $2) \
-    AND ($3::text IS NULL OR ($3 = 'placed') = (p.device_id IS NOT NULL))";
+const FROM: &str = "FROM devices v JOIN device_models m ON m.id = v.model_id \
+    JOIN deliveries d ON d.id = v.delivery_id JOIN clients c ON c.id = d.client_id \
+    LEFT JOIN device_placements p ON p.device_id = v.id";
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct InventoryItem {
@@ -63,58 +66,143 @@ pub struct InventoryItem {
 #[derive(Debug, Deserialize)]
 pub struct ListQuery {
     q: Option<String>,
+    /// Все критерии на одном устройстве («и»); без него достаточно любого («или»).
+    #[serde(default)]
+    exact: bool,
     destination: Option<String>,
     /// placed | unplaced
     placement: Option<String>,
-    #[serde(default)]
-    offset: i64,
-    limit: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
-pub struct InventoryPage {
+pub struct InventoryList {
     items: Vec<InventoryItem>,
     total: i64,
-    offset: i64,
-    limit: i64,
+    /// Что поняла строка поиска: «номера …; MAC …; текст …».
+    summary: String,
+}
+
+/// Условия фильтров и поиска после WHERE.
+fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, query: &ListQuery, search: &DeviceSearch) {
+    qb.push(" WHERE TRUE");
+    if let Some(destination) = text::clean(query.destination.clone()) {
+        qb.push(" AND v.destination = ").push_bind(destination);
+    }
+    match query.placement.as_deref() {
+        Some("placed") => {
+            qb.push(" AND p.device_id IS NOT NULL");
+        }
+        Some("unplaced") => {
+            qb.push(" AND p.device_id IS NULL");
+        }
+        _ => {}
+    }
+    if search.is_empty() {
+        return;
+    }
+    qb.push(" AND (");
+    for (i, criterion) in search.criteria.iter().enumerate() {
+        if i > 0 {
+            qb.push(if query.exact { " AND " } else { " OR " });
+        }
+        match criterion {
+            Criterion::Index(index) => {
+                qb.push("v.device_index = ").push_bind(index.clone());
+            }
+            // INDEX — 7 цифр с ведущими нулями, поэтому строки сравниваются как числа.
+            Criterion::Range(from, to) => {
+                qb.push("v.device_index BETWEEN ")
+                    .push_bind(from.clone())
+                    .push(" AND ")
+                    .push_bind(to.clone());
+            }
+            Criterion::Mac(mac) => {
+                qb.push("v.mac_address = ").push_bind(mac.clone());
+            }
+            Criterion::Text(value) => {
+                let pattern = text::like_pattern(Some(value)).unwrap_or_default();
+                qb.push("(");
+                let columns = [
+                    "v.device_index",
+                    "v.mac_address",
+                    "v.serial_no",
+                    "m.manufacturer",
+                    "m.model",
+                    "m.manufacturer || ' ' || m.model",
+                    "c.name",
+                    "d.number",
+                    "d.device_group",
+                ];
+                for (j, column) in columns.iter().enumerate() {
+                    if j > 0 {
+                        qb.push(" OR ");
+                    }
+                    qb.push(format!("{column} ILIKE "))
+                        .push_bind(pattern.clone());
+                }
+                qb.push(")");
+            }
+        }
+    }
+    qb.push(")");
 }
 
 async fn list(
     State(db): State<Db>,
     Query(query): Query<ListQuery>,
-) -> AppResult<Json<InventoryPage>> {
-    let limit = query.limit.unwrap_or(100).clamp(1, PAGE_MAX);
-    let offset = query.offset.max(0);
-    let pattern = text::like_pattern(query.q.as_deref());
-    let destination = text::clean(query.destination);
-    let placement = text::clean(query.placement).filter(|p| p == "placed" || p == "unplaced");
+) -> AppResult<Json<InventoryList>> {
+    let search = DeviceSearch::parse(query.q.as_deref().unwrap_or_default());
 
-    let total = sqlx::query_scalar::<_, i64>(&format!(
-        "SELECT count(*) FROM devices v JOIN device_models m ON m.id = v.model_id \
-         JOIN deliveries d ON d.id = v.delivery_id JOIN clients c ON c.id = d.client_id \
-         LEFT JOIN device_placements p ON p.device_id = v.id {WHERE}"
-    ))
-    .bind(&pattern)
-    .bind(&destination)
-    .bind(&placement)
-    .fetch_one(&db)
-    .await?;
-    let items = sqlx::query_as::<_, InventoryItem>(&format!(
-        "{SELECT} {WHERE} ORDER BY v.device_index LIMIT $4 OFFSET $5"
-    ))
-    .bind(&pattern)
-    .bind(&destination)
-    .bind(&placement)
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&db)
-    .await?;
-    Ok(Json(InventoryPage {
+    let mut count = QueryBuilder::<Postgres>::new(format!("SELECT count(*) {FROM}"));
+    push_filters(&mut count, &query, &search);
+    let total = count.build_query_scalar::<i64>().fetch_one(&db).await?;
+
+    let mut rows = QueryBuilder::<Postgres>::new(SELECT);
+    push_filters(&mut rows, &query, &search);
+    rows.push(" ORDER BY v.device_index LIMIT ")
+        .push_bind(ROWS_MAX);
+    let items = rows
+        .build_query_as::<InventoryItem>()
+        .fetch_all(&db)
+        .await?;
+
+    Ok(Json(InventoryList {
         items,
         total,
-        offset,
-        limit,
+        summary: search.summary(query.exact),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatsQuery {
+    destination: Option<String>,
+}
+
+/// Плитки над реестром: как на складе mf-old.
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct InventoryStats {
+    devices: i64,
+    clients: i64,
+    models: i64,
+    with_mac: i64,
+    placed: i64,
+}
+
+async fn stats(
+    State(db): State<Db>,
+    Query(query): Query<StatsQuery>,
+) -> AppResult<Json<InventoryStats>> {
+    let row = sqlx::query_as::<_, InventoryStats>(
+        "SELECT count(*) AS devices, count(DISTINCT d.client_id) AS clients, count(DISTINCT v.model_id) AS models, \
+         count(v.mac_address) AS with_mac, count(p.device_id) AS placed \
+         FROM devices v JOIN deliveries d ON d.id = v.delivery_id \
+         LEFT JOIN device_placements p ON p.device_id = v.id \
+         WHERE ($1::text IS NULL OR v.destination = $1)",
+    )
+    .bind(text::clean(query.destination))
+    .fetch_one(&db)
+    .await?;
+    Ok(Json(row))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]

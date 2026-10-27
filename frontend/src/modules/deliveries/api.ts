@@ -138,11 +138,20 @@ const inventoryItemSchema = z.object({
 });
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 
-const inventoryPageSchema = z.object({
+/** Все найденные устройства разом и то, как сервер понял строку поиска. */
+const inventoryListSchema = z.object({
   items: z.array(inventoryItemSchema),
   total: z.number().int(),
-  offset: z.number().int(),
-  limit: z.number().int(),
+  summary: z.string(),
+});
+
+/** Плитки над реестром «Главной». */
+const inventoryStatsSchema = z.object({
+  devices: z.number().int(),
+  clients: z.number().int(),
+  models: z.number().int(),
+  with_mac: z.number().int(),
+  placed: z.number().int(),
 });
 
 /** Карточка устройства: данные и история изменений (когда, кто, было → стало). */
@@ -159,12 +168,13 @@ const deviceCardSchema = inventoryItemSchema.extend({
 });
 export type DeviceCard = z.infer<typeof deviceCardSchema>;
 
-export type InventoryParams = { q: string; destination: string; placement: string };
+export type InventoryParams = { q: string; exact: boolean; destination: string; placement: string };
 
-export const INVENTORY_PAGE = 100;
+export const listInventory = (params: InventoryParams) =>
+  apiGet(withQuery('/inventory', params), inventoryListSchema);
 
-export const listInventory = (params: InventoryParams, offset: number) =>
-  apiGet(withQuery('/inventory', { ...params, offset, limit: INVENTORY_PAGE }), inventoryPageSchema);
+export const getInventoryStats = (destination: string) =>
+  apiGet(withQuery('/inventory/stats', { destination }), inventoryStatsSchema);
 
 export const getDevice = (id: string) => apiGet(`/inventory/${id}`, deviceCardSchema);
 

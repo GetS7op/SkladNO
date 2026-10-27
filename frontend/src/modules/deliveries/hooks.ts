@@ -1,12 +1,12 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   advanceDelivery,
   createDelivery,
   type DeliveryListParams,
   getDelivery,
   getDevice,
-  INVENTORY_PAGE,
   type InventoryParams,
+  getInventoryStats,
   listInventory,
   updateDevice,
   importDeviceData,
@@ -23,6 +23,7 @@ export const deliveryKeys = {
   files: (id: string) => ['deliveries', 'files', id] as const,
   groups: ['deliveries', 'groups'] as const,
   inventory: (params: InventoryParams) => ['deliveries', 'inventory', params] as const,
+  inventoryStats: (destination: string) => ['deliveries', 'inventory-stats', destination] as const,
   device: (id: string) => ['deliveries', 'device', id] as const,
 };
 
@@ -101,17 +102,20 @@ export function useUploadDeliveryFiles(id: string) {
   });
 }
 
-/** Реестр INDEX постранично: «Показать ещё» догружает следующие 100 устройств. */
+/** Реестр INDEX: все найденные устройства разом (как в mf-old). */
 export function useInventory(params: InventoryParams) {
-  return useInfiniteQuery({
+  return useQuery({
     queryKey: deliveryKeys.inventory(params),
-    queryFn: ({ pageParam }) => listInventory(params, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (last) =>
-      last.offset + INVENTORY_PAGE < last.total ? last.offset + INVENTORY_PAGE : undefined,
+    queryFn: () => listInventory(params),
     placeholderData: (previous) => previous,
   });
 }
+
+export const useInventoryStats = (destination: string) =>
+  useQuery({
+    queryKey: deliveryKeys.inventoryStats(destination),
+    queryFn: () => getInventoryStats(destination),
+  });
 
 export const useDevice = (id: string) =>
   useQuery({ queryKey: deliveryKeys.device(id), queryFn: () => getDevice(id) });
