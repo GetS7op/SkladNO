@@ -238,8 +238,12 @@ h2 {
   min-width: 200px;
   height: 32px;
 }
-.search input {
+/* Сильнее общего правила для полей ниже: без своей рамки и высоты внутри поля поиска */
+.search input:not([type='checkbox']) {
+  height: auto;
+  padding: 0;
   border: 0;
+  border-radius: 0;
   outline: 0;
   background: transparent;
   width: 100%;
@@ -703,6 +707,8 @@ textarea:focus {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: 1fr;
+    /* Шапка — по содержимому, остальная высота экрана — рабочей области */
+    grid-template-rows: auto 1fr;
   }
   .sidebar {
     position: sticky;

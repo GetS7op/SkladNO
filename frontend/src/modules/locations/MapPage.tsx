@@ -172,28 +172,30 @@ function ShelfDetails({ code, onClose }: { code: string; onClose: () => void }) 
       {shelf.error && <p className="error">{shelf.error.message}</p>}
       {shelf.data?.devices.length === 0 && <p className="muted">Полка пуста</p>}
       {shelf.data && shelf.data.devices.length > 0 && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Index</th>
-              <th>Модель</th>
-              <th>Поставка</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shelf.data.devices.map((d) => (
-              <tr key={d.device_index}>
-                <td className="mono">
-                  <b>{d.device_index}</b>
-                </td>
-                <td>
-                  {d.manufacturer} {d.model}
-                </td>
-                <td className="mono">{d.delivery_number}</td>
+        <div className="lines-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Index</th>
+                <th>Модель</th>
+                <th>Поставка</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {shelf.data.devices.map((d) => (
+                <tr key={d.device_index}>
+                  <td className="mono">
+                    <b>{d.device_index}</b>
+                  </td>
+                  <td>
+                    {d.manufacturer} {d.model}
+                  </td>
+                  <td className="mono">{d.delivery_number}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

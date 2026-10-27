@@ -73,28 +73,30 @@ export function DeliveryPage() {
 
       <section className="card">
         <h2>Строки</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Модель</th>
-              <th className="num">Количество</th>
-              <th>Диапазон Index</th>
-            </tr>
-          </thead>
-          <tbody>
-            {d.lines.map((l) => (
-              <tr key={l.model_id}>
-                <td>
-                  {l.manufacturer} <b>{l.model}</b>
-                </td>
-                <td className="num">{l.quantity}</td>
-                <td className="mono">
-                  {l.first_index === l.last_index ? l.first_index : `${l.first_index} – ${l.last_index}`}
-                </td>
+        <div className="lines-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Модель</th>
+                <th className="num">Количество</th>
+                <th>Диапазон Index</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {d.lines.map((l) => (
+                <tr key={l.model_id}>
+                  <td>
+                    {l.manufacturer} <b>{l.model}</b>
+                  </td>
+                  <td className="num">{l.quantity}</td>
+                  <td className="mono">
+                    {l.first_index === l.last_index ? l.first_index : `${l.first_index} – ${l.last_index}`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <DevicesCard delivery={d} />

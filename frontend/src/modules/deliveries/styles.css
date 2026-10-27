@@ -88,3 +88,17 @@
 .badge.customs {
   margin-left: 6px;
 }
+
+/* Узкий экран (ТСД): этапы — по два в ряд, длинная подпись кнопки перехода переносится */
+@media (max-width: 900px) {
+  .stepper {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stepper-action .btn {
+    height: auto;
+    min-height: 38px;
+    padding-block: 8px;
+    white-space: normal;
+    text-align: left;
+  }
+}
