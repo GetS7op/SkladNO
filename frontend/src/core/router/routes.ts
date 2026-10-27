@@ -1,14 +1,18 @@
 import {
+  Activity,
   Boxes,
+  ClipboardList,
   Container,
   Cpu,
   History,
   Map,
+  MapPinned,
   Network,
   PackagePlus,
   ScanBarcode,
   Server,
   Settings,
+  Settings2,
   ShieldCheck,
   Users,
   Warehouse,
@@ -24,11 +28,13 @@ export type NavItem = {
   minRole: Role;
 };
 
-export type NavSection = { title: string; items: NavItem[] };
+/** Раздел меню: заголовок раскрывает подпункты. */
+export type NavSection = { title: string; icon: LucideIcon; items: NavItem[] };
 
 export const NAV: NavSection[] = [
   {
     title: 'Учёт',
+    icon: ClipboardList,
     items: [
       { to: '/deliveries', label: 'Поставки', icon: PackagePlus, minRole: 'operator' },
       { to: '/inventory', label: 'Реестр INDEX', icon: ScanBarcode, minRole: 'operator' },
@@ -38,6 +44,7 @@ export const NAV: NavSection[] = [
   },
   {
     title: 'Размещение',
+    icon: MapPinned,
     items: [
       { to: '/warehouses', label: 'Склады', icon: Warehouse, minRole: 'operator' },
       { to: '/map', label: 'Карта', icon: Map, minRole: 'operator' },
@@ -47,6 +54,7 @@ export const NAV: NavSection[] = [
   },
   {
     title: 'Мониторинг',
+    icon: Activity,
     items: [
       { to: '/pools', label: 'Вайтлист пулов', icon: Network, minRole: 'operator' },
       { to: '/workers', label: 'Вайтлист воркеров', icon: Server, minRole: 'operator' },
@@ -54,6 +62,7 @@ export const NAV: NavSection[] = [
   },
   {
     title: 'Система',
+    icon: Settings2,
     items: [
       { to: '/audit', label: 'Журнал', icon: History, minRole: 'operator' },
       { to: '/users', label: 'Пользователи', icon: ShieldCheck, minRole: 'admin' },
@@ -71,6 +80,12 @@ export function navForRole(role: Role): NavSection[] {
 }
 
 /** Раздел меню, к которому относится адрес (для подсветки и заголовка). */
+/** Раздел меню, в котором открытая страница. */
+export function navSectionFromPathname(pathname: string): NavSection | null {
+  const item = navItemFromPathname(pathname);
+  return NAV.find((section) => item && section.items.includes(item)) ?? null;
+}
+
 export function navItemFromPathname(pathname: string): NavItem | null {
   for (const section of NAV) {
     for (const item of section.items) {

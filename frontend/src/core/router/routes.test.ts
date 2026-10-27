@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { navForRole, navItemFromPathname } from './routes';
+import { navForRole, navItemFromPathname, navSectionFromPathname } from './routes';
 
 const labels = (role: Parameters<typeof navForRole>[0]) =>
   navForRole(role).flatMap((section) => section.items.map((item) => item.label));
@@ -33,5 +33,19 @@ describe('navItemFromPathname', () => {
 
   it('does not match a section by prefix of another word', () => {
     expect(navItemFromPathname('/devicesx')).toBeNull();
+  });
+});
+
+describe('navSectionFromPathname', () => {
+  it.each([
+    ['/inventory/0f1e', 'Учёт'],
+    ['/labels/shelves', 'Размещение'],
+    ['/settings', 'Система'],
+  ])('%s → %s', (pathname, title) => {
+    expect(navSectionFromPathname(pathname)?.title).toBe(title);
+  });
+
+  it('returns null outside the menu', () => {
+    expect(navSectionFromPathname('/nowhere')).toBeNull();
   });
 });

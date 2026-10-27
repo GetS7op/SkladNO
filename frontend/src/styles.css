@@ -157,15 +157,52 @@ h2 {
   color: var(--accent-ink);
   background: var(--accent);
 }
-.nav-group + .nav-group {
-  margin-top: 18px;
-}
+/* Раздел меню: заголовок-кнопка раскрывает подпункты */
 .nav-section {
-  margin: 0 12px 8px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #c9cbc3;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+.nav-section:hover {
+  color: #fff;
+  background: #1c1f18;
+}
+.nav-section.active {
+  color: #fff;
+}
+.nav-section span {
+  flex: 1;
+}
+.nav-section .chevron {
   color: #5d6157;
+  transition: transform 0.2s ease;
+}
+.nav-group.expanded .chevron {
+  transform: rotate(180deg);
+}
+/* Подпункты — с отступом и линией слева, под своим разделом */
+.nav-items {
+  display: grid;
+  gap: 3px;
+  margin: 3px 0 8px 20px;
+  padding-left: 10px;
+  border-left: 1px solid #292c24;
+}
+.nav-items .nav-item {
+  min-height: 36px;
+  font-size: 14px;
 }
 .workspace {
   min-width: 0;
@@ -735,7 +772,7 @@ textarea:focus {
   .sidebar-body {
     margin-top: 16px;
   }
-  .primary-nav {
+  .nav-items {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
   .workspace {
