@@ -380,6 +380,10 @@ npm --prefix frontend run typecheck
 npm --prefix frontend test           # Vitest
 ```
 
+Всё это, а также `cargo fmt`/`clippy`, Prettier, сборка и приёмка на чистом стенде в Docker с HTTPS
+выполняются на GitHub при каждом push в `main` (`.github/workflows/ci.yml`, вкладка **Actions**).
+Перед `git pull` на сервере стоит убедиться, что последний запуск зелёный.
+
 Критерии приёмки SPEC (F-01…F-09, роли, этапы поставки, размещение, настройки, экспорт) проверяет
 `scripts/acceptance.sh` через API. Он создаёт тестовые данные и работает только на **пустом**
 экземпляре — например, на отдельном стенде рядом с рабочим:
